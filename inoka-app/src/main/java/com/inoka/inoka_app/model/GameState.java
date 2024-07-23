@@ -1,0 +1,14 @@
+package com.inoka.inoka_app.model;
+
+public enum GameState {
+    WAITING_FOR_PLAYERS,
+    DRAWING_CARDS,
+    COUNT_DOWN,
+    CLASH_ROLL_INIT,
+    CLASH_ROLL_HP,
+    CLASH_PLAYER_TURN,
+    CLASH_PROCESSING_DECISION,
+    CLASH_TOTEM,
+    CLASH_CONCLUDED,
+    FINISHED
+}
