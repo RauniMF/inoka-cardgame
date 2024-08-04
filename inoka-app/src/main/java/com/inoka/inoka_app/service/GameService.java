@@ -4,12 +4,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.inoka.inoka_app.model.Player;
+import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 import com.inoka.inoka_app.repositories.PlayerRepository;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.List;
 
 @Service
@@ -28,8 +30,16 @@ public class GameService {
     public List<Player> findAllPlayers() {
         return gameRepo.findAll();
     }
-    public Player updatePlayer(Player player) {
-        return gameRepo.save(player);
+    public boolean updatePlayer(String id, String name) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(id);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+            player.setName(name);
+            gameRepo.save(player);
+            return true;
+        } else {
+            return false;
+        }
     }
     public boolean removePlayerById(String id) {
         if (gameRepo.existsById(id)) {
@@ -46,12 +56,32 @@ public class GameService {
     public void removeAllPlayers() {
         gameRepo.deleteAll();
     }
+    public Optional<List<Card>> getPlayerDeck(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        if (!playerCheck.isPresent()) {
+            return Optional.empty();
+        }
+        Player playerTransient = playerCheck.get();
+        String gameId = playerTransient.getGameId();
+        if ((gameId.equals("Not in game")) || (gameId == null) || (gameId.isEmpty())) {
+            return Optional.empty();
+        }
+        // Now we know the player is in a game, so we find the game in the game map
+        Game game = games.get(gameId);
+        // Now we access the player's deck through the game, which is holding its value in memory
+        for (Player player : game.getPlayers()) {
+            if (player.getId().equals(playerId)) {
+                return Optional.of(player.getDeck());
+            }
+        }
+        return Optional.empty();
+    }
 
     public Game createGame(String passcode, Player player) {
         if (passcode == null || passcode.isEmpty()) {
             // Check if there's an existing game without a passcode and in WAITING_FOR_PLAYERS state
             for (Game game : games.values()) {
-                if (game.getPasscode() == null && game.getState() == GameState.WAITING_FOR_PLAYERS) {
+                if ((game.getPasscode() == null || game.getPasscode().isEmpty()) && game.getState() == GameState.WAITING_FOR_PLAYERS) {
                     game.addPlayer(player); // Add the player to the existing game
                     gameRepo.save(player);
                     return game;

@@ -2,6 +2,7 @@ package com.inoka.inoka_app.controller;
 
 import org.springframework.web.bind.annotation.RestController;
 
+import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.model.PlayerEntry;
@@ -20,10 +21,14 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 
 import java.util.List;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
 
 
 
@@ -58,6 +63,17 @@ public class GameController {
         return new ResponseEntity<>(pEntry, HttpStatus.CREATED);
     }
 
+    @PutMapping("player/update")
+    public ResponseEntity<?> updatePlayer(@RequestParam String name, @RequestBody String id) {
+        boolean updated = gameService.updatePlayer(id, name);
+        if (updated) {
+            return new ResponseEntity<>(HttpStatus.OK);
+        }
+        else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
     @DeleteMapping("/player/remove")
     public ResponseEntity<?> removePlayerById(@RequestParam String id) {
         boolean removed = gameService.removePlayerById(id);
@@ -74,6 +90,18 @@ public class GameController {
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
+    @GetMapping("/player/card/all")
+    public ResponseEntity<List<Card>> getPlayerDeck(@RequestParam String playerId) {
+        Optional<List<Card>> cardCheck = gameService.getPlayerDeck(playerId);
+        if (cardCheck.isPresent()) {
+            List<Card> cards = cardCheck.get();
+            return ResponseEntity.ok(cards);
+        }
+        else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
     @PostMapping("/game/create")
     public ResponseEntity<String> createGame(@RequestParam(required = false) String passcode, @RequestBody String id) {
         Player player = gameService.findPlayerById(id);
@@ -85,7 +113,7 @@ public class GameController {
         }
     }
 
-    @PostMapping("/game/join")
+    @PutMapping("/game/join")
     public ResponseEntity<String> joinGame(@RequestParam String passcode, @RequestBody String id) {
         Player player = gameService.findPlayerById(id);
         boolean success = gameService.addPlayerToGame(passcode, player);
@@ -95,11 +123,17 @@ public class GameController {
             return ResponseEntity.status(403).body("Game cannot be joined");
         }
     }
+
+    @GetMapping("/game/find")
+    public ResponseEntity<Game> findGameByGameId(@RequestParam String id) {
+        Game game = gameService.getGame(id);
+        return ResponseEntity.ok(game);
+    }
     
     @GetMapping("/game/all")
-    public ResponseEntity<Map<String,Game>> getAllGames() {
+    public ResponseEntity<List<Game>> getAllGames() {
         Map<String, Game> games = gameService.getAllGames();
-        return ResponseEntity.ok(games);
+        return ResponseEntity.ok(games.values().stream().collect(Collectors.toList()));
     }
     
 }
