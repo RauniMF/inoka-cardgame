@@ -8,7 +8,10 @@ import { HttpErrorResponse } from '@angular/common/http';
   selector: 'app-user',
   template: `
     @if ( player.name != '') {
-        <p>Your username is {{ player.name }}</p>
+        <i>Welcome, {{ player.name }}</i>
+    }
+    @else {
+        Enter a username
     }
   `,
   standalone: true,
@@ -21,28 +24,54 @@ export class UserComponent {
     constructor(private gameService: GameService) {}
     
     ngOnInit(): void {
+      const storedUUID = localStorage.getItem('userUUID');
+      if (storedUUID) {
+        this.checkIfPlayerExists(storedUUID);
+      }
+      else {
         this.addPlayer();
       }
+    }
 
     ngOnChanges(changes: SimpleChanges): void {
-        if (changes['username']) {
-          this.player.name = this.username;
-        }
+      if (changes['username']) {
+        this.player.name = this.username;
       }
+    }
     
     public addPlayer(): void {
-        this.gameService.addPlayer(this.player).subscribe(
-            (response: Player) => {
-                this.player = response;
-            }
-        );
+      this.gameService.addPlayer(this.player).subscribe(
+        (response: Player) => {
+          if (response.id) {
+            this.player = response;
+            localStorage.setItem('userUUID', response.id);
+          }
+        });
     }
 
-    public updatePlayer(): void {
-        if (this.player.id && this.username) {
-            this.gameService.updatePlayer(this.username, this.player.id).subscribe(
-                {error: (e) => alert(e.message)}
-            )
-        }
+  public updatePlayer(): void {
+    if (this.player.id && this.username) {
+      this.gameService.updatePlayer(this.username, this.player.id).subscribe(
+        {error: (e) => alert(e.message)})
     }
+  }
+
+  public getPlayerID(): string {
+    if (this.player.id) {
+      return this.player.id;
+    }
+    else {
+      return 'Null';
+    }
+  }
+
+  public checkIfPlayerExists(id: string): void {
+    this.gameService.findPlayer(id).subscribe(
+      (response: Player) => {
+        this.player = response;
+      },
+      (error) => {
+        this.addPlayer()
+      });
+  }
 }

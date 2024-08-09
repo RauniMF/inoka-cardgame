@@ -7,6 +7,7 @@ import { HttpClient, provideHttpClient, withFetch } from '@angular/common/http';
 import { UserComponent } from './user.component';
 import { FormsModule } from '@angular/forms';
 import { GameService } from './game.service';
+import { QueueComponent } from "./queue.component";
 
 @NgModule({
   declarations: [
@@ -16,8 +17,9 @@ import { GameService } from './game.service';
     BrowserModule,
     AppRoutingModule,
     UserComponent,
-    FormsModule
-  ],
+    FormsModule,
+    QueueComponent
+],
   providers: [
     provideHttpClient(withFetch()),
     HttpClient,

@@ -10,6 +10,7 @@
 
 > Implement front end
 - Get page setup for basic implementation
+- Find a way to make it so user is cached, won't make a new user when refreshed on the same browser
 - Join game by passcode
 - Waiting screen showing players in lobby
 - The game itself

@@ -106,11 +106,7 @@ public class GameController {
     public ResponseEntity<String> createGame(@RequestParam(required = false) String passcode, @RequestBody String id) {
         Player player = gameService.findPlayerById(id);
         Game game = gameService.createGame(passcode, player);
-        if (game.getPlayers().size() > 1) {
-            return ResponseEntity.ok("Joined existing game");
-        } else {
-            return ResponseEntity.ok("Created new game");
-        }
+        return ResponseEntity.ok(game.getId());
     }
 
     @PutMapping("/game/join")

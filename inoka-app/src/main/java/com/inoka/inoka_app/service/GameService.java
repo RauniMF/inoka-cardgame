@@ -69,10 +69,9 @@ public class GameService {
         // Now we know the player is in a game, so we find the game in the game map
         Game game = games.get(gameId);
         // Now we access the player's deck through the game, which is holding its value in memory
-        for (Player player : game.getPlayers()) {
-            if (player.getId().equals(playerId)) {
-                return Optional.of(player.getDeck());
-            }
+        Player player = game.getPlayers().get(playerId);
+        if (player != null) {
+            return Optional.of(player.getDeck());
         }
         return Optional.empty();
     }

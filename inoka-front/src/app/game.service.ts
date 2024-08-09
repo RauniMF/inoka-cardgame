@@ -16,19 +16,19 @@ export class GameService {
         return this.http.get<Player[]>(`${this.apiServerUrl}/player/all`);
     }
 
-    public findPlayer(id: String): Observable<Player> {
-        return this.http.get<Player>(`${this.apiServerUrl}/player/find?id={id}`);
+    public findPlayer(id: string): Observable<Player> {
+        return this.http.get<Player>(`${this.apiServerUrl}/player/find?id=${id}`);
     }
 
     public addPlayer(player: Player): Observable<Player> {
         return this.http.post<Player>(`${this.apiServerUrl}/player/add`, player);
     }
 
-    public updatePlayer(name: String, id: String): Observable<void> {
+    public updatePlayer(name: string, id: string): Observable<void> {
         return this.http.put<void>(`${this.apiServerUrl}/player/update?name=${name}`, id);
     }
 
-    public removePlayer(id: String): Observable<void> {
+    public removePlayer(id: string): Observable<void> {
         return this.http.delete<void>(`${this.apiServerUrl}/player/remove?id=${id}`);
     }
 
@@ -36,20 +36,20 @@ export class GameService {
         return this.http.delete<void>(`${this.apiServerUrl}/player/remove/all`);
     }
 
-    public getPlayerDeck(playerId: String): Observable<Card[]> {
+    public getPlayerDeck(playerId: string): Observable<Card[]> {
         return this.http.get<Card[]>(`${this.apiServerUrl}/player/card/all?playerId={playerId}`);
     }
 
-    public createGame(playerId: String, passcode: String = ""): Observable<String> {
+    public createGame(playerId: string, passcode: string = ""): Observable<string> {
         if (passcode === "") {
-            return this.http.post<String>(`${this.apiServerUrl}/game/create`, playerId);
+            return this.http.post<string>(`${this.apiServerUrl}/game/create`, playerId);
         }
         else {
-            return this.http.post<String>(`${this.apiServerUrl}/game/create?passcode=${passcode}`, playerId);
+            return this.http.post<string>(`${this.apiServerUrl}/game/create?passcode=${passcode}`, playerId);
         }
     }
 
-    public joinGame(playerId: String, passcode: String): Observable<String> {
-        return this.http.put<String>(`${this.apiServerUrl}/game/join?passcode={passcode}`, playerId);
+    public joinGame(playerId: string, passcode: string): Observable<string> {
+        return this.http.put<string>(`${this.apiServerUrl}/game/join?passcode=${passcode}`, playerId);
     }
 }
