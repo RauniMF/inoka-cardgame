@@ -16,10 +16,11 @@ import java.util.List;
 
 @Service
 public class GameService {
+    @Autowired
     private final PlayerRepository gameRepo;
+    // Transient game data stored in HashMap
     private Map<String, Game> games = new HashMap<>();
     
-    @Autowired
     public GameService(PlayerRepository gameRepo) {
         this.gameRepo = gameRepo;
     }

@@ -1,6 +1,6 @@
 import {Component, input, Input, SimpleChanges} from '@angular/core';
-import { GameService } from './game.service';
-import { Player } from './player';
+import { GameService } from '../../game.service';
+import { Player } from '../player';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 

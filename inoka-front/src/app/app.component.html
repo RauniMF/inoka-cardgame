@@ -1,18 +1,4 @@
-<div>
+<main>
   <h1>{{ title }}</h1>
-
-  <div class="box">
-    <app-user [username]="username"></app-user><br><br>
-    <label for="username">Enter your name:</label><br>
-    <input id="username" #nameInput /><br><br>
-    <button (click)="updateAndSavePlayer(nameInput.value)">Update</button>
-  </div>
-
-  <div class="box">
-    <label for="passcode">Join a game:</label><br><br>
-    <input id="passcode" placeholder="Passcode (optional)" #passInput /><br><br>
-    <button (click)="joinGame(passInput.value)">Join Game</button>
-    <app-queue [passcode]="passcode"></app-queue>
-  </div>
-
-</div>
+  <router-outlet/>
+</main> 

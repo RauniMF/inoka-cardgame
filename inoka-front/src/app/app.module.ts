@@ -4,10 +4,11 @@ import { BrowserModule } from '@angular/platform-browser';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { HttpClient, provideHttpClient, withFetch } from '@angular/common/http';
-import { UserComponent } from './user.component';
+import { UserComponent } from './components/front-page/user.component';
 import { FormsModule } from '@angular/forms';
 import { GameService } from './game.service';
-import { QueueComponent } from "./queue.component";
+import { QueueComponent } from "./components/front-page/queue.component";
+import { FrontPageComponent } from './components/front-page/front.component';
 
 @NgModule({
   declarations: [
@@ -18,7 +19,8 @@ import { QueueComponent } from "./queue.component";
     AppRoutingModule,
     UserComponent,
     FormsModule,
-    QueueComponent
+    QueueComponent,
+    FrontPageComponent
 ],
   providers: [
     provideHttpClient(withFetch()),

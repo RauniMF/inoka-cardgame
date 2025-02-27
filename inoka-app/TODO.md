@@ -6,14 +6,21 @@
  > Live database of active users
 - Implement database using MySQL (DONE)
 - Use Spring to streamline queries (DONE)
-- Use Postman to test API
+- Use Postman to test API (DONE)
 
 > Implement front end
 - Get page setup for basic implementation
-- Find a way to make it so user is cached, won't make a new user when refreshed on the same browser
-- Join game by passcode
+     - Username and join lobby inputs (DONE)
+     - Join existing game with passcode (Done, handled by service in backend, making joinGame method redundant)
+- Find a way to make it so user is cached, won't make a new user when refreshed on the same browser (Done)
+- Join game by passcode (Done)
 - Waiting screen showing players in lobby
-- The game itself
+     - Open lobby page when pressing Join Game button 
+     - Display waiting players in lobby
+     - Implement ready button
+     - Check for players present, remove them if not
+     - Show players who are ready
+     - Game starts when at least 3 players are ready
 
 > Game flow
 - Only player Id, name and game Id will be kept on the database.
