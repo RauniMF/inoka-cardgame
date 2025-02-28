@@ -20,17 +20,4 @@ import { QueueComponent } from './queue.component';
     ngAfterViewInit(): void {
         this.cdr.detectChanges();
     }
-    
-    updateAndSavePlayer(newName: string): void {
-        this.username = newName;
-        localStorage.setItem('username', this.username);
-        this.cdr.detectChanges();
-        this.userComponent.updatePlayer();
-    }
-    
-    joinGame(newPass: string): void {
-        this.passcode = newPass;
-        this.cdr.detectChanges();
-        this.queueComponent.joinGame(this.passcode);
-    }
   }

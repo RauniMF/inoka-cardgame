@@ -76,7 +76,10 @@ public class GameService {
         }
         return Optional.empty();
     }
-
+    
+    /*
+     * Creates or joins existing game
+     */
     public Game createGame(String passcode, Player player) {
         if (passcode == null || passcode.isEmpty()) {
             // Check if there's an existing game without a passcode and in WAITING_FOR_PLAYERS state

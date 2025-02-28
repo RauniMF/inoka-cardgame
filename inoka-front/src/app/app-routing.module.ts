@@ -10,7 +10,10 @@ const routes: Routes = [
     },
   },
   {
-    
+    path: 'lobby',
+    loadComponent: () => {
+      return import('./components/lobby/lobby.component').then((m) => m.LobbyComponent)
+    }
   }
 ];
 

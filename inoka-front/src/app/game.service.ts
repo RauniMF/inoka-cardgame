@@ -5,7 +5,7 @@ import { Player } from "./components/player";
 import { Card } from "./components/card";
 
 @Injectable({
-    providedIn: 'root'
+    providedIn: 'root' // Ensures a singleton instance across the entire application
 })
 export class GameService {
     private apiServerUrl = 'http://localhost:8080/inoka';
@@ -42,10 +42,10 @@ export class GameService {
 
     public createGame(playerId: string, passcode: string = ""): Observable<string> {
         if (passcode === "") {
-            return this.http.post<string>(`${this.apiServerUrl}/game/create`, playerId);
+            return this.http.post<string>(`${this.apiServerUrl}/game/create`, playerId, { responseType: 'text' as 'json' });
         }
         else {
-            return this.http.post<string>(`${this.apiServerUrl}/game/create?passcode=${passcode}`, playerId);
+            return this.http.post<string>(`${this.apiServerUrl}/game/create?passcode=${passcode}`, playerId, { responseType: 'text' as 'json' });
         }
     }
 

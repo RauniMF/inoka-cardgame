@@ -12,6 +12,7 @@ import io.micrometer.core.ipc.http.HttpSender.Response;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,6 +27,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import javax.print.attribute.standard.Media;
+
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
@@ -106,7 +110,12 @@ public class GameController {
     public ResponseEntity<String> createGame(@RequestParam(required = false) String passcode, @RequestBody String id) {
         Player player = gameService.findPlayerById(id);
         Game game = gameService.createGame(passcode, player);
-        return ResponseEntity.ok(game.getId());
+        
+        if (game == null || game.getId() == null || game.getId().isEmpty()) {
+            return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body("Error: Could not join game.");
+        }
+        
+        return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(game.getId());
     }
 
     @PutMapping("/game/join")

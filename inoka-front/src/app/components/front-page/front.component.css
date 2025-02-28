@@ -21,6 +21,10 @@ h1 {
     font-size: 3vh;
 }
 
+.main {
+    margin-right: 10%
+}
+
 label {
     font-size: 3vh;
 }

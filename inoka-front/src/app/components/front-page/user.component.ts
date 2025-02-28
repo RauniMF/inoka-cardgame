@@ -1,19 +1,23 @@
-import {Component, input, Input, SimpleChanges} from '@angular/core';
+import {ChangeDetectorRef, Component, inject, Input, SimpleChanges} from '@angular/core';
 import { GameService } from '../../game.service';
 import { Player } from '../player';
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
   selector: 'app-user',
   template: `
-    @if ( player.name != '') {
+    @if ( player.name !== '') {
         <i>Welcome, {{ player.name }}</i>
     }
     @else {
         Enter a username
     }
+    <br/><br/>
+    <label for="username">Enter your name:</label><br>
+    <input id="username" #nameInput /><br><br>
+    <button (click)="updateAndSavePlayer(nameInput.value)">Update</button>
   `,
+  styleUrl: './front.component.css',
   standalone: true,
   imports: [CommonModule],
 })
@@ -21,7 +25,8 @@ export class UserComponent {
     @Input() public username: string = '';
     public player: Player = { name: this.username };
     
-    constructor(private gameService: GameService) {}
+    private gameService = inject(GameService);
+    private cdr = inject(ChangeDetectorRef);
     
     ngOnInit(): void {
       const storedUUID = localStorage.getItem('userUUID');
@@ -73,5 +78,13 @@ export class UserComponent {
       (error) => {
         this.addPlayer()
       });
+  }
+
+  updateAndSavePlayer(newName: string): void {
+    this.username = newName;
+    this.player.name = this.username;
+    localStorage.setItem('username', this.username);
+    this.cdr.detectChanges();
+    this.updatePlayer();
   }
 }
