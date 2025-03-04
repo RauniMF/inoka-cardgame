@@ -1,0 +1,11 @@
+<h2> Lobby </h2>
+
+<p>{{ lobbyStatus() }}</p>
+
+<ul>
+    @for (item of players; track item.name) {
+        <li>{{ item.name }}</li>
+    }
+</ul>
+
+<button (click)="toggleReady()">Ready Up</button>

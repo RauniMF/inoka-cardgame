@@ -10,6 +10,7 @@ import { GameService } from './game.service';
 import { QueueComponent } from "./components/front-page/queue.component";
 import { FrontPageComponent } from './components/front-page/front.component';
 import { LobbyComponent } from './components/lobby/lobby.component';
+import { LobbyMainComponent } from './components/lobby/lobby-main.component';
 
 @NgModule({
   declarations: [
@@ -22,8 +23,9 @@ import { LobbyComponent } from './components/lobby/lobby.component';
     FormsModule,
     QueueComponent,
     FrontPageComponent,
-    LobbyComponent
-],
+    LobbyComponent,
+    LobbyMainComponent
+  ],
   providers: [
     provideHttpClient(withFetch()),
     HttpClient,

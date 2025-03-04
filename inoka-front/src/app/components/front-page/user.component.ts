@@ -1,12 +1,13 @@
-import {ChangeDetectorRef, Component, inject, Input, SimpleChanges} from '@angular/core';
+import {ChangeDetectorRef, Component, inject, Input, OnDestroy, OnInit, SimpleChanges} from '@angular/core';
 import { GameService } from '../../game.service';
 import { Player } from '../player';
 import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-user',
   template: `
-    @if ( player.name !== '') {
+    @if ( player != null && player.name !== '') {
         <i>Welcome, {{ player.name }}</i>
     }
     @else {
@@ -15,76 +16,35 @@ import { CommonModule } from '@angular/common';
     <br/><br/>
     <label for="username">Enter your name:</label><br>
     <input id="username" #nameInput /><br><br>
-    <button (click)="updateAndSavePlayer(nameInput.value)">Update</button>
+    <button (click)="updatePlayer(nameInput.value)">Update</button>
   `,
   styleUrl: './front.component.css',
   standalone: true,
   imports: [CommonModule],
 })
-export class UserComponent {
-    @Input() public username: string = '';
-    public player: Player = { name: this.username };
+export class UserComponent implements OnInit, OnDestroy {
+  @Input() public username: string = '';
+  public player: Player | null = null;
+  private playerSubscription: Subscription | null = null;
     
-    private gameService = inject(GameService);
-    private cdr = inject(ChangeDetectorRef);
+  private gameService = inject(GameService);
     
-    ngOnInit(): void {
-      const storedUUID = localStorage.getItem('userUUID');
-      if (storedUUID) {
-        this.checkIfPlayerExists(storedUUID);
+  ngOnInit(): void {
+    this.playerSubscription = this.gameService.player$.subscribe(
+      (player) => {
+        this.player = player;
       }
-      else {
-        this.addPlayer();
-      }
-    }
-
-    ngOnChanges(changes: SimpleChanges): void {
-      if (changes['username']) {
-        this.player.name = this.username;
-      }
-    }
-    
-    public addPlayer(): void {
-      this.gameService.addPlayer(this.player).subscribe(
-        (response: Player) => {
-          if (response.id) {
-            this.player = response;
-            localStorage.setItem('userUUID', response.id);
-          }
-        });
-    }
-
-  public updatePlayer(): void {
-    if (this.player.id && this.username) {
-      this.gameService.updatePlayer(this.username, this.player.id).subscribe(
-        {error: (e) => alert(e.message)})
-    }
+    );
   }
 
-  public getPlayerID(): string {
-    if (this.player.id) {
-      return this.player.id;
-    }
-    else {
-      return 'Null';
-    }
+  ngOnDestroy(): void {
+    this.playerSubscription?.unsubscribe(); // Clean up subscription
   }
 
-  public checkIfPlayerExists(id: string): void {
-    this.gameService.findPlayer(id).subscribe(
-      (response: Player) => {
-        this.player = response;
-      },
-      (error) => {
-        this.addPlayer()
-      });
-  }
-
-  updateAndSavePlayer(newName: string): void {
-    this.username = newName;
-    this.player.name = this.username;
-    localStorage.setItem('username', this.username);
-    this.cdr.detectChanges();
-    this.updatePlayer();
+  public updatePlayer(newName: string): void {
+    if (this.player?.id && newName) {
+      this.username = newName;
+      this.gameService.updatePlayer(this.username);
+    }
   }
 }

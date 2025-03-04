@@ -9,6 +9,7 @@ import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 import com.inoka.inoka_app.repositories.PlayerRepository;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +17,7 @@ import java.util.List;
 
 @Service
 public class GameService {
+    // Repo containing player data (name, id, gameid)
     @Autowired
     private final PlayerRepository gameRepo;
     // Transient game data stored in HashMap
@@ -52,7 +54,11 @@ public class GameService {
         }
     }
     public Player findPlayerById(String id) {
-        return gameRepo.findPlayerById(id).orElseThrow(() -> new PlayerNotFoundException ("Player by id " + id + " was not found."));
+        Optional<Player> playerCheck = gameRepo.findPlayerById(id);
+        if (playerCheck.isPresent()) {
+            return playerCheck.get();
+        }
+        return null;
     }
     public void removeAllPlayers() {
         gameRepo.deleteAll();
@@ -122,6 +128,12 @@ public class GameService {
         return games;
     }
 
+    /*
+     * Given a passcode,
+     * Add player to open lobby with passcode
+     * Returns true if player was successfully added
+     * Else, false
+     */
     public boolean addPlayerToGame(String passcode, Player player) {
         for (Game game : games.values()) {
             if (game.getPasscode() != null && game.getPasscode().equals(passcode)) {
@@ -135,5 +147,63 @@ public class GameService {
             }
         }
         return false;
+    }
+
+    /*
+     * Given the UUID of a game,
+     * Return a List of players in game
+     */
+    public Optional<List<Player>> getPlayersInGame(String gameId) {
+        Game game = this.getGame(gameId);
+
+        if (game == null) {
+            return Optional.empty();
+        }
+
+        if (game.getPlayers().isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new ArrayList<>(game.getPlayers().values()));
+    }
+
+    /*
+     * Given a player's UUID,
+     * set the player's isReady to True
+     * Returns true if success
+     * else false
+     */
+    public boolean setPlayerReady(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+            // Set player ready in transient Game data
+            Game game = games.get(player.getGameId());
+            Player playerTransient = game.getPlayer(player.getId());
+            playerTransient.setReady(true);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    /*
+     * Given the UUID of a game,
+     * Check if all players in a game are ready to start match
+     * Returns Optional.empty() if gameId is invalid
+     * Returns true if all players in game are ready
+     * Returns false otherwise
+     */
+    public Optional<Boolean> allPlayersReady(String gameId) {
+        Optional<List<Player>> playersCheck = this.getPlayersInGame(gameId);
+
+        if (playersCheck.isEmpty()) {
+            return Optional.empty();
+        }
+
+        for (Player player : playersCheck.get()) if(!player.isReady()) return Optional.of(false);
+
+        return Optional.of(true);
     }
 }

@@ -42,6 +42,9 @@ public class Game {
     public Map<String, Player> getPlayers() {
         return players;
     }
+    public Player getPlayer(String playerId) {
+        return players.get(playerId);
+    }
 
     public void updatePasscode(String passcode) {
         this.passcode = passcode;

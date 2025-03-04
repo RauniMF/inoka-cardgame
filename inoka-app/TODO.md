@@ -15,12 +15,12 @@
 - Find a way to make it so user is cached, won't make a new user when refreshed on the same browser (Done)
 - Join game by passcode (Done)
 - Waiting screen showing players in lobby
-     - Open lobby page when pressing Join Game button 
+     - Open lobby page when pressing Join Game button  (DONE)
      - Display waiting players in lobby
      - Implement ready button
      - Check for players present, remove them if not
      - Show players who are ready
-     - Game starts when at least 3 players are ready
+     - Game starts when at least 2 players are ready
 
 > Game flow
 - Only player Id, name and game Id will be kept on the database.

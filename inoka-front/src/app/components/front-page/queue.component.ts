@@ -1,6 +1,7 @@
-import { ChangeDetectorRef, Component, inject, Input } from "@angular/core";
+import { ChangeDetectorRef, Component, inject, Input, OnDestroy, OnInit } from "@angular/core";
 import { GameService } from "../../game.service";
-import { Router } from "@angular/router";
+import { Player } from "../player";
+import { Subscription } from "rxjs";
 
 @Component({
     selector: 'app-queue',
@@ -11,30 +12,37 @@ import { Router } from "@angular/router";
     `,
     styleUrl: './front.component.css',
     standalone: true,
-  })
-  export class QueueComponent {
-    @Input() public passcode: string = '';
+})
+export class QueueComponent implements OnInit, OnDestroy {
+  @Input() public passcode: string = '';
 
-    private gameService = inject(GameService);
-    private cdr = inject(ChangeDetectorRef);
-    private router = inject(Router);
+  private gameService = inject(GameService);
+  private cdr = inject(ChangeDetectorRef);
 
-    joinGame(passcode: string = ''): void {
-      this.cdr.detectChanges();
-      const storedUUID = localStorage.getItem('userUUID');
-      if (storedUUID) {
-        this.gameService.createGame(storedUUID, passcode).subscribe(
-          (response: string) => {
-            localStorage.setItem("gameID", response);
-            this.router.navigate(['/lobby']);
-        },
-          (error) => {
-            console.error("Failed to join game: ", error);
-          });
+  public player: Player | null = null;
+  private playerSubscription: Subscription | undefined;
+
+  ngOnInit(): void {
+    // Subscribe to player changes
+    this.playerSubscription = this.gameService.player$.subscribe(
+      (player) => {
+        this.player = player;
+        this.cdr.detectChanges();
       }
-      else {
-        console.warn("No user UUID found in local storage.");
-      }
-    }
-  
+    );
   }
+
+  ngOnDestroy(): void {
+    this.playerSubscription?.unsubscribe(); // Clean up subscription
+  }
+
+  joinGame(passcode: string = ''): void {
+    if (!this.player?.id) {
+      console.warn("No player found. Please register first.");
+      return;
+    }
+
+    this.gameService.createGame(this.player.id, passcode)
+  }
+
+}

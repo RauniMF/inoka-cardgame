@@ -56,14 +56,22 @@ public class GameController {
     @GetMapping("/player/find")
     public ResponseEntity<PlayerEntry> getPlayerById(@RequestParam String id) {
         Player player = gameService.findPlayerById(id);
-        PlayerEntry pEntry = new PlayerEntry(player);
-        return ResponseEntity.ok(pEntry);
+        if (player != null) {
+            return ResponseEntity.ok(new PlayerEntry(player));
+        }
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
     @PostMapping("/player/add")
     public ResponseEntity<PlayerEntry> addPlayer(@RequestBody Player player) {
-        Player newPlayer = gameService.addPlayer(player);
-        PlayerEntry pEntry = new PlayerEntry(newPlayer);
+        PlayerEntry pEntry;
+        if (player.getId() == "") {
+            Player newPlayer = new Player(player.getName());
+            pEntry = new PlayerEntry(gameService.addPlayer(newPlayer));
+        }
+        else {
+            pEntry = new PlayerEntry(gameService.addPlayer(player));
+        }
         return new ResponseEntity<>(pEntry, HttpStatus.CREATED);
     }
 
@@ -139,6 +147,38 @@ public class GameController {
     public ResponseEntity<List<Game>> getAllGames() {
         Map<String, Game> games = gameService.getAllGames();
         return ResponseEntity.ok(games.values().stream().collect(Collectors.toList()));
+    }
+    
+    @GetMapping("/game/players")
+    public ResponseEntity<List<Player>> getPlayersInGame(@RequestParam String id) {
+        Optional<List<Player>> playersList = gameService.getPlayersInGame(id);
+        if (playersList.isPresent()) {
+            List<Player> players = playersList.get();
+            return ResponseEntity.ok(players);
+        }
+        else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @PutMapping(value = "/player/ready", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> setPlayerReady(@RequestBody String id) {
+        boolean success = gameService.setPlayerReady(id);
+        if (success) {
+            return ResponseEntity.ok("Player readied up.");
+        } else {
+            return ResponseEntity.status(404).body("Error setting player ready: Player not found.");
+        }
+    }
+
+    @GetMapping("/game/ready")
+    public ResponseEntity<Boolean> allPlayersReady(@RequestParam String id) {
+        Optional<Boolean> arePlayersReady = gameService.allPlayersReady(id);
+        if (arePlayersReady.isPresent()) {
+            if (arePlayersReady.get()) return ResponseEntity.ok(true);
+            else return ResponseEntity.status(206).body(false);
+        }
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
     
 }
