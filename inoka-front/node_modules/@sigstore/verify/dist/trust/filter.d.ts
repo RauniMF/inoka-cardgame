@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import type { CertAuthority, TLogAuthority } from './trust.types';
 type CertAuthorityFilterCriteria = {
     start: Date;

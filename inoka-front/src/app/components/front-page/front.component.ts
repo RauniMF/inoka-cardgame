@@ -10,9 +10,8 @@ import { Subscription } from 'rxjs';
     selector: 'app-front',
     templateUrl: './front.component.html',
     styleUrl: './front.component.css',
-    standalone: true,
-    imports: [UserComponent, QueueComponent],
-  })
+    imports: [UserComponent, QueueComponent]
+})
   export class FrontPageComponent implements OnInit, OnDestroy {
     username: string = '';
     passcode: string = '';

@@ -5,8 +5,8 @@ import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 
 @Component({
-  selector: 'app-user',
-  template: `
+    selector: 'app-user',
+    template: `
     @if ( player != null && player.name !== '') {
         <i>Welcome, {{ player.name }}</i>
     }
@@ -18,9 +18,8 @@ import { Subscription } from 'rxjs';
     <input id="username" #nameInput /><br><br>
     <button (click)="updatePlayer(nameInput.value)">Update</button>
   `,
-  styleUrl: './front.component.css',
-  standalone: true,
-  imports: [CommonModule],
+    styleUrl: './front.component.css',
+    imports: [CommonModule]
 })
 export class UserComponent implements OnInit, OnDestroy {
   @Input() public username: string = '';
