@@ -1,6 +1,7 @@
 package com.inoka.inoka_app.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.inoka.inoka_app.model.Player;
@@ -18,15 +19,14 @@ import java.util.List;
 @Service
 public class GameService {
     // Repo containing player data (name, id, gameid)
-    @Autowired
     private final PlayerRepository gameRepo;
     // Transient game data stored in HashMap
     private Map<String, Game> games = new HashMap<>();
-    
+
     public GameService(PlayerRepository gameRepo) {
         this.gameRepo = gameRepo;
     }
-
+    
     public Player addPlayer(Player player) {
         return gameRepo.save(player);
     }

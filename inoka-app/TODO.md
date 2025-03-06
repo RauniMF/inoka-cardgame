@@ -16,11 +16,13 @@
 - Join game by passcode (Done)
 - Waiting screen showing players in lobby
      - Open lobby page when pressing Join Game button  (DONE)
-     - Display waiting players in lobby
-     - Implement ready button
+     - Display waiting players in lobby (Done)
+           - Update players list and show their ready status
+     - Implement ready button (Done)
      - Check for players present, remove them if not
      - Show players who are ready
-     - Game starts when at least 2 players are ready
+     - Game starts when at least 2 players are ready (Done)
+           - Route to game page
 
 > Game flow
 - Only player Id, name and game Id will be kept on the database.
