@@ -13,7 +13,7 @@ public class Card {
     public Card(CardStyle style, int level) {
         this.style = style;
         this.level = level;
-        this.maxHp = rollHitDice(level);
+        this.maxHp = this.rollHitDice(level);
         this.curHp = this.maxHp;
         this.hasTotem = false;
         this.taunterCharges = 0;

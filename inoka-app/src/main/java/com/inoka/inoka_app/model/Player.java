@@ -21,7 +21,7 @@ public class Player implements Serializable{
     @Id
     @Column(name = "play_id", nullable = true, updatable = false, length = 128)
     private String id;
-    @Column(name = "play_name", nullable = true, updatable = false, length = 255)
+    @Column(name = "play_name", nullable = true, updatable = true, length = 255)
     private String name;
     @Column(name = "game_id", nullable = true, updatable = true, length = 128)
     private String gameId;

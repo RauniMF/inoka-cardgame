@@ -1,0 +1,41 @@
+body, html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center; 
+}
+
+h1 {
+    margin: 10px 0;
+    font-size: 9vh;
+}
+
+.box {
+    border: 2px solid black;
+    padding: 2%;
+    width: 50%;
+    margin-top: 2%;
+    margin-left: auto;
+    font-size: 3vh;
+}
+
+.main {
+    margin-right: 10%
+}
+
+label {
+    font-size: 3vh;
+}
+
+input {
+    font-size: 2vh;
+    height: 3vh;
+    width: 25%
+}
+
+button {
+    font-size: 2vh;
+    height: 3vh;
+}
