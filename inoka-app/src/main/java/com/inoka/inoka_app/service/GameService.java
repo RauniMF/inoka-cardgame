@@ -1,7 +1,7 @@
 package com.inoka.inoka_app.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 
 import com.inoka.inoka_app.model.Player;
@@ -10,10 +10,12 @@ import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 import com.inoka.inoka_app.repositories.PlayerRepository;
 
+import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.List;
 
 @Service
@@ -21,12 +23,41 @@ public class GameService {
     // Repo containing player data (name, id, gameid)
     private final PlayerRepository gameRepo;
     // Transient game data stored in HashMap
-    private Map<String, Game> games = new HashMap<>();
+    private final ConcurrentHashMap<String, Game> games = new ConcurrentHashMap<>();;
 
-    public GameService(PlayerRepository gameRepo) {
+    // Handle broadcasting changes made to Game objects
+    private final SimpMessagingTemplate messagingTemplate;
+    private final CopyOnWriteArraySet<String> pendingGameUpdates = new CopyOnWriteArraySet<>();
+    private final ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+
+    public GameService(PlayerRepository gameRepo, SimpMessagingTemplate messagingTemplate) {
         this.gameRepo = gameRepo;
+        this.messagingTemplate = messagingTemplate;
+        scheduler.initialize();
+        startBatchUpdateTask();
     }
-    
+
+    // Broadcasts pending changes to Game objects on a fixed 500ms interval
+    private void startBatchUpdateTask() {
+        scheduler.scheduleAtFixedRate(this::broadcastPendingUpdates, Duration.ofMillis(500));
+    }
+
+    private void broadcastPendingUpdates() {
+        for (String gameId: pendingGameUpdates) {
+            games.computeIfPresent(gameId, (String id, Game game) -> {
+                synchronized (game) {
+                    messagingTemplate.convertAndSend("/topic/game/"+ game.getId(), game);
+                }
+                return game;
+            });
+        }
+        pendingGameUpdates.clear();
+    }
+
+    public void queueGameUpdate(String gameId) {
+        pendingGameUpdates.add(gameId);
+    }
+
     public Player addPlayer(Player player) {
         return gameRepo.save(player);
     }
@@ -86,13 +117,13 @@ public class GameService {
     /*
      * Creates or joins existing game
      */
-    public Game createGame(String passcode, Player player) {
+    public synchronized Game createGame(String passcode, Player player) {
         if (passcode == null || passcode.isEmpty()) {
             // Check if there's an existing game without a passcode and in WAITING_FOR_PLAYERS state
             for (Game game : games.values()) {
                 if ((game.getPasscode() == null || game.getPasscode().isEmpty()) && game.getState() == GameState.WAITING_FOR_PLAYERS) {
-                    game.addPlayer(player); // Add the player to the existing game
-                    gameRepo.save(player);
+                    // Add the player to the existing game
+                    this.addPlayerToGame(game.getId(), player);
                     return game;
                 }
             }
@@ -101,8 +132,7 @@ public class GameService {
         for (Game game : games.values()) {
             if (game.getPasscode() != null && game.getPasscode().equals(passcode)) {
                 if (game.getState() == GameState.WAITING_FOR_PLAYERS) {
-                    game.addPlayer(player);
-                    gameRepo.save(player);
+                    this.addPlayerToGame(game.getId(), player);
                     return game;
                 }
             }
@@ -110,11 +140,11 @@ public class GameService {
 
         // If no suitable game was found, create a new game with the given passcode
         Game game = (passcode != null && !passcode.isEmpty()) ? new Game(passcode) : new Game();
-        game.addPlayer(player);
-        gameRepo.save(player);
         games.put(game.getId(), game);
+        this.addPlayerToGame(game.getId(), player);
         return game;
     }
+
     public Game getGame(String id) {
         return games.get(id);
     }
@@ -134,19 +164,15 @@ public class GameService {
      * Returns true if player was successfully added
      * Else, false
      */
-    public boolean addPlayerToGame(String passcode, Player player) {
-        for (Game game : games.values()) {
-            if (game.getPasscode() != null && game.getPasscode().equals(passcode)) {
-                if (game.getState() == GameState.WAITING_FOR_PLAYERS) {
-                    game.addPlayer(player);
-                    gameRepo.save(player);
-                    return true;
-                } else {
-                    return false; // Game is not in the correct state
-                }
+    public void addPlayerToGame(String gameId, Player player) {
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                game.addPlayer(player);
+                gameRepo.save(player);
+                queueGameUpdate(gameId);
+                return game;
             }
-        }
-        return false;
+        });
     }
 
     /*
@@ -178,12 +204,18 @@ public class GameService {
         if (playerCheck.isPresent()) {
             Player player = playerCheck.get();
             // Set player ready in transient Game data
-            Game game = games.get(player.getGameId());
-            Player playerTransient = game.getPlayer(player.getId());
-            playerTransient.setReady(true);
+            String gameId = player.getGameId();
+            
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    Player playerTransient = game.getPlayer(player.getId());
+                    playerTransient.setReady(true);
+                    queueGameUpdate(gameId);
+                    return game;
+                }
+            });
             return true;
-        }
-        else {
+        } else {
             return false;
         }
     }

@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, inject, Input, OnDestroy, OnInit } from "@angular/core";
-import { GameService } from "../../game.service";
+import { GameService } from "../../services/game.service";
 import { Player } from "../player";
 import { Subscription } from "rxjs";
 

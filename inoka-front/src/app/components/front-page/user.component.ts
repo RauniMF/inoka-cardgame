@@ -1,5 +1,5 @@
 import {ChangeDetectorRef, Component, inject, Input, OnDestroy, OnInit, SimpleChanges} from '@angular/core';
-import { GameService } from '../../game.service';
+import { GameService } from '../../services/game.service';
 import { Player } from '../player';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';

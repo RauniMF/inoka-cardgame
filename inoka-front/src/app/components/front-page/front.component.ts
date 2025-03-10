@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, inject, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { UserComponent } from './user.component';
 import { QueueComponent } from './queue.component';
-import { GameService } from '../../game.service';
+import { GameService } from '../../services/game.service';
 import { Router } from '@angular/router';
 import { Game, GameState } from '../game';
 import { Subscription } from 'rxjs';

@@ -8,6 +8,12 @@
 - Use Spring to streamline queries (DONE)
 - Use Postman to test API (DONE)
 
+> Update back end
+- STOMP WebSocket communication
+- GameWebSocketController message handling
+- Broadcasts using ScheduledExecutorService in GameService
+- Games map as ConcurrentHashMap + synchronized() implementation for Game object modification
+
 > Implement front end
 - Get page setup for basic implementation
      - Username and join lobby inputs (DONE)

@@ -1,5 +1,5 @@
 import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { GameService } from '../../game.service';
+import { GameService } from '../../services/game.service';
 import { Player } from '../player';
 import { Observable, Subscription } from 'rxjs';
 
@@ -15,7 +15,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
   players: Player[] = [];
   lobbyStatus = signal("Waiting for players");
   private playerSubscription: Subscription | null = null;
-  private playersSubscription: Subscription | null = null;
+  private gameSubscription: Subscription | null = null;
 
   ngOnInit(): void {
     this.fetchPlayers();
@@ -24,7 +24,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     // Clean up subscriptions
     this.playerSubscription?.unsubscribe();
-    this.playersSubscription?.unsubscribe();
+    this.gameSubscription?.unsubscribe();
   }
 
   fetchPlayers(): void {
@@ -37,10 +37,14 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
           const gameId = this.player.gameId;
     
           // Get all players data for lobby status
-          this.playersSubscription = this.gameService.getPlayersInLobby(gameId).subscribe(
-            (players: Player[]) => {
-              this.players = players;
-              this.updateLobbyStatus();
+          this.gameSubscription = this.gameService.game$.subscribe({
+            next: (gameUpdate) => {
+              if (gameUpdate) {
+                this.players = Array.isArray(gameUpdate.players) ? gameUpdate.players : Object.values(gameUpdate.players);
+                this.updateLobbyStatus();
+              }
+            },
+            error: (e) => console.log("Could not fetch Game data in lobby-main: ", e)
           });
         }
       },

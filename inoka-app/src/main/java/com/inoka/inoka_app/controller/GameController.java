@@ -126,17 +126,6 @@ public class GameController {
         return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(game.getId());
     }
 
-    @PutMapping("/game/join")
-    public ResponseEntity<String> joinGame(@RequestParam String passcode, @RequestBody String id) {
-        Player player = gameService.findPlayerById(id);
-        boolean success = gameService.addPlayerToGame(passcode, player);
-        if (success) {
-            return ResponseEntity.ok("Player added to game");
-        } else {
-            return ResponseEntity.status(403).body("Game cannot be joined");
-        }
-    }
-
     @GetMapping("/game/find")
     public ResponseEntity<Game> findGameByGameId(@RequestParam String id) {
         Game game = gameService.getGame(id);

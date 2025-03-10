@@ -1,9 +1,10 @@
 import { HttpClient, HttpHeaders } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { BehaviorSubject, Observable } from "rxjs"
-import { Player } from "./components/player";
-import { Card } from "./components/card";
-import { Game } from "./components/game";
+import { Player } from "../components/player";
+import { Card } from "../components/card";
+import { Game } from "../components/game";
+import { GameWebSocketService } from "./game-websocket.service";
 
 @Injectable({
     providedIn: 'root' // Ensures a singleton instance across the entire application
@@ -19,10 +20,17 @@ export class GameService {
     private gameSubject = new BehaviorSubject<Game | null>(null);
     public game$ = this.gameSubject.asObservable();
 
-    constructor(private http: HttpClient) {
+    constructor(private http: HttpClient, private gameWebSocketService: GameWebSocketService) {
         // Initialize player data when service starts
         console.log("Page loaded");
         this.loadPlayer();
+
+        this.gameWebSocketService.gameUpdates$.subscribe((updatedGame: Game | null) => {
+            if (updatedGame) {
+                console.log("Game update received via WebSocket: ", updatedGame);
+                this.gameSubject.next(updatedGame);
+            }
+        });
     }
 
     /*
@@ -66,6 +74,7 @@ export class GameService {
         this.http.get<Game>(`${this.apiServerUrl}/game/find?id=${gameId}`).subscribe({
             next: (game) => {
                 this.gameSubject.next(game);
+                this.gameWebSocketService.connect(game.id);
             },
             error: (e) => console.error("Could not load game: ", e)
         })

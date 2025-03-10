@@ -14,8 +14,8 @@ export enum GameState {
 }
 
 export interface Game {
-    id: String;
+    id: string;
     players: Player[];
-    passcode: String;
+    passcode: string;
     state: GameState;
 }
