@@ -3,6 +3,7 @@ import { Client, IMessage } from "@stomp/stompjs";
 import { BehaviorSubject, Observable } from "rxjs";
 import { Game } from "../components/game";
 import SockJS from "sockjs-client";
+import { Card } from "../components/card";
 
 
 @Injectable({
@@ -24,10 +25,10 @@ export class GameWebSocketService {
         });
 
         this.stompClient.onConnect = () => {
-            console.log('Connected to WebSocket for gameId:', gameId);
+            // console.log('Connected to WebSocket for gameId:', gameId);
             this.stompClient.subscribe(`/topic/game/${gameId}`, (message: IMessage) => {
                 const updatedGame: Game = JSON.parse(message.body);
-                console.log('Received game update: ', updatedGame);
+                // console.log('Received game update: ', updatedGame);
                 this.gameSubject.next(updatedGame);
             });
         }
@@ -41,5 +42,13 @@ export class GameWebSocketService {
         }
     }
 
-    
+    playCard(playerId: string, card: Card): void {
+        if (this.stompClient && this.stompClient.connected) {
+            const message = { playerId, card };
+            this.stompClient.publish({
+                destination: "/app/playCard",
+                body: JSON.stringify(message)
+            })
+        }
+    }
 }

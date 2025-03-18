@@ -2,6 +2,7 @@ import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { GameService } from '../../services/game.service';
 import { Player } from '../player';
 import { Observable, Subscription } from 'rxjs';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-lobby-main',
@@ -10,12 +11,16 @@ import { Observable, Subscription } from 'rxjs';
   styleUrl: './lobby-main.component.css'
 })
 export class LobbyMainComponent implements OnInit, OnDestroy {
+  private router = inject(Router);
   private gameService = inject(GameService);
+  
   public player: Player | null = null;
   players: Player[] = [];
   lobbyStatus = signal("Waiting for players");
   private playerSubscription: Subscription | null = null;
   private gameSubscription: Subscription | null = null;
+
+  private startingFlag: boolean = true;
 
   ngOnInit(): void {
     this.fetchPlayers();
@@ -73,7 +78,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
       this.gameService.allPlayersReady(gameId).subscribe({
         next: (r) => {
           const allReady = r;
-          if (allReady) this.startGameCooldown();
+          if (allReady && this.startingFlag) this.startGameCooldown();
           else this.lobbyStatus.set("Waiting for all players to be ready...");
         },
         error: (e) => console.error(`Game id:${gameId} error returning player ready status: `, e)
@@ -106,6 +111,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
   startGameCooldown(): void {
     let count = 5;
     this.lobbyStatus.set(`Game starting in: ${count}`);
+    this.startingFlag = false;
 
     const interval = setInterval(() => {
       count--;
@@ -115,6 +121,13 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
         clearInterval(interval);
         // Navigate to game page
         this.lobbyStatus.set("Game starting...");
+        this.gameService.startGame().subscribe({
+          next: () => {
+            console.log("Game starting.");
+            this.router.navigate(["/game"]);
+          },
+          error: (e) => console.log("Could not start game in lobby-main: ", e)
+        });
       }
     }, 1000);
   }

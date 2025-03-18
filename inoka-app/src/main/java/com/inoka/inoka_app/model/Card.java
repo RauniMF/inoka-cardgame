@@ -79,8 +79,11 @@ public class Card {
         this.curHp += healing;
     }
 
-    public boolean hasTotem() {
+    public boolean isHasTotem() {
         return hasTotem;
+    }
+    public int getTaunterCharges() {
+        return taunterCharges;
     }
     public void giveTotem() {
         this.hasTotem = true;

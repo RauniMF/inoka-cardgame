@@ -1,7 +1,7 @@
 enum CardStyle {
-    ATTACKER,
-    DEFENDER,
-    TRICKSTER
+    ATTACKER = "ATTACKER",
+    DEFENDER = "DEFENDER",
+    TRICKSTER = "TRICKSTER"
 }
 
 export interface Card {

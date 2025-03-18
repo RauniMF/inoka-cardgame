@@ -27,7 +27,7 @@ export class GameService {
 
         this.gameWebSocketService.gameUpdates$.subscribe((updatedGame: Game | null) => {
             if (updatedGame) {
-                console.log("Game update received via WebSocket: ", updatedGame);
+                // console.log("Game update received via WebSocket: ", updatedGame);
                 this.gameSubject.next(updatedGame);
             }
         });
@@ -158,7 +158,12 @@ export class GameService {
         return this.http.put(`${this.apiServerUrl}/player/ready`, playerId, { headers, responseType: 'text' as 'json' }) as Observable<string>;
     }
 
-    public allPlayersReady(gameId: String): Observable<Boolean> {
+    public allPlayersReady(gameId: string): Observable<Boolean> {
         return this.http.get<Boolean>(`${this.apiServerUrl}/game/ready?id=${gameId}`);
+    }
+
+    public startGame(): Observable<void> {
+        const gameId = this.gameSubject.value?.id;
+        return this.http.put<void>(`${this.apiServerUrl}/game/start`, gameId);
     }
 }

@@ -1,0 +1,11 @@
+<div class="card">
+    <h3>{{ card.style }}</h3>
+    <p>Level: {{ card.level }}</p>
+    <p>HP: {{ card.curHp }}/{{ card.maxHp }}</p>
+    @if (card.hasTotem) {
+        <p>Holding Totem</p>
+    }
+    @if (isTaunter()) {
+        <p> Charges: {{ card.taunterCharges }}</p>
+    }
+</div>

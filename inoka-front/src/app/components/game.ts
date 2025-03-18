@@ -1,3 +1,4 @@
+import { Card } from "./card";
 import { Player } from "./player";
 
 export enum GameState {
@@ -18,4 +19,5 @@ export interface Game {
     players: Player[];
     passcode: string;
     state: GameState;
+    cardsInPlay: Map<string, Card>;
 }

@@ -9,10 +9,10 @@
 - Use Postman to test API (DONE)
 
 > Update back end
-- STOMP WebSocket communication
+- STOMP WebSocket communication (DONE)
 - GameWebSocketController message handling
-- Broadcasts using ScheduledExecutorService in GameService
-- Games map as ConcurrentHashMap + synchronized() implementation for Game object modification
+- Broadcasts using ScheduledExecutorService in GameService (Done)
+- Games map as ConcurrentHashMap + synchronized() implementation for Game object modification (Done)
 
 > Implement front end
 - Get page setup for basic implementation
@@ -28,13 +28,14 @@
      - Check for players present, remove them if not
      - Show players who are ready
      - Game starts when at least 2 players are ready (Done)
-           - Route to game page
+           - **Route to game page** (Done)
 
 > Game flow
 - Only player Id, name and game Id will be kept on the database.
 - Game map will keep track of player decks and other attributes.
-- Show hand at start
-- Choose card
+- Show hand at start (Done)
+- Choose card (Done)
+     - Communicate with the back-end to set Card in play
 - Countdown then show all players cards
 - Go in initiative order, player chooses move
 - Process the move and move onto next player

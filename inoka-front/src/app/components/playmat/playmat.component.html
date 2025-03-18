@@ -1,0 +1,9 @@
+<p>playmat works!</p>
+<div class="playmat-area">
+    @if (selectedCard) {
+    <app-card
+        [card]="selectedCard"
+    ></app-card>
+    }
+</div>
+<app-hand (selectedCardEmitter)="selectedCard = $event"/>

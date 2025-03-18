@@ -1,0 +1,14 @@
+app-hand {
+    position: absolute;
+    margin: 0%;
+    left: 0%;
+    width: 100%;
+    bottom: 2vh;
+}
+
+.playmat-area {
+    position: absolute;
+    margin: auto;
+    height: 100%;
+    width: 100%;
+}

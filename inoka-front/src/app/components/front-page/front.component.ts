@@ -37,6 +37,8 @@ import { Subscription } from 'rxjs';
             case GameState.WAITING_FOR_PLAYERS:
               this.router.navigate(["/lobby"]);
               break;
+            case GameState.DRAWING_CARDS:
+              this.router.navigate(["/game"]);
           }
         }
       );

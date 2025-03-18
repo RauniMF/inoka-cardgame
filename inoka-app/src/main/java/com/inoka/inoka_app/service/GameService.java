@@ -180,17 +180,17 @@ public class GameService {
      * Return a List of players in game
      */
     public Optional<List<Player>> getPlayersInGame(String gameId) {
-        Game game = this.getGame(gameId);
+        // Mutable object you can modify inside lambda expression
+        final List<Optional<List<Player>>> result = new ArrayList<>(1);
+        result.add(Optional.empty());
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                result.set(0, Optional.of(new ArrayList<>(game.getPlayers().values())));
+                return game;
+            }
+        });
 
-        if (game == null) {
-            return Optional.empty();
-        }
-
-        if (game.getPlayers().isEmpty()) {
-            return Optional.empty();
-        }
-
-        return Optional.of(new ArrayList<>(game.getPlayers().values()));
+        return result.get(0);
     }
 
     /*
@@ -237,5 +237,48 @@ public class GameService {
         for (Player player : playersCheck.get()) if(!player.isReady()) return Optional.of(false);
 
         return Optional.of(true);
+    }
+
+    /*
+     * Given the UUID of a game,
+     * set the GameState to DRAWING_CARDS
+     * and queue broadcast
+     */
+    public void setGameStart(String gameId) {
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                game.setState(GameState.DRAWING_CARDS);
+                queueGameUpdate(gameId);
+                return game;
+            }
+        });
+    }
+
+
+    /*
+     * Given the UUID of a player and a Card object,
+     * Add the card to the Map of cards in play
+     * in the game the player is in
+     * Returns true if successful, false otherwise
+     */
+    public boolean putCardInPlay(String playerId, Card card) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    Player playerTransient = game.getPlayer(player.getId());
+                    game.addCardInPlay(playerId, card);
+                    playerTransient.removeCardFromDeck(card);
+                    queueGameUpdate(gameId);
+                    return game;
+                }
+            });
+            return true;
+        } else {
+            return false;
+        }
     }
 }

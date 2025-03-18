@@ -170,4 +170,9 @@ public class GameController {
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
     
+    @PutMapping(value = "/game/start", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<?> startGame(@RequestBody String id) {
+        gameService.setGameStart(id);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
 }

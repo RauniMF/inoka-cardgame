@@ -87,6 +87,12 @@ public class Player implements Serializable{
             return false; // Deck is full
         }
     }
+    public void removeCardFromDeck(Card card) {
+        if (this.deck.contains(card)) {
+            this.deck.remove(card);
+        }
+    }
+
     private void generateRandomDeck() {
         Random rand = new Random();
         CardStyle[] styles = CardStyle.values();
