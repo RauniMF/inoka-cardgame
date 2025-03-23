@@ -11,7 +11,7 @@
             <p class="stowed_text"> Click to view hand </p>
         }
 
-        @for (card of cards; track card; let index = $index) {
+        @for (card of cards; track card.id; let index = $index) {
                 <app-card
                     [card]="card"
                     (mouseover)="onHover(index)"

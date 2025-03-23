@@ -1,8 +1,13 @@
 package com.inoka.inoka_app.model;
 
+import java.util.Objects;
 import java.util.Random;
+import java.util.UUID;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class Card {
+    private String id;
     private CardStyle style;
     private int level;
     private int maxHp;
@@ -10,7 +15,8 @@ public class Card {
     private boolean hasTotem;
     private int taunterCharges;
 
-    public Card(CardStyle style, int level) {
+    public Card(@JsonProperty("style") CardStyle style, @JsonProperty("level") int level) {
+        this.id = UUID.randomUUID().toString();
         this.style = style;
         this.level = level;
         this.maxHp = this.rollHitDice(level);
@@ -54,6 +60,10 @@ public class Card {
         }
     }
 
+    public String getId() {
+        return id;
+    }
+
     public CardStyle getStyle() {
         return style;
     }
@@ -90,5 +100,14 @@ public class Card {
     }
     public void takeTotem() {
         this.hasTotem = false;
-    }    
+    }
+    
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || this.getClass() != o.getClass()) return false;
+        Card otherCard = (Card) o;
+        return (this.level == otherCard.level) && (this.maxHp == otherCard.maxHp) && Objects.equals(this.style, otherCard.style);
+    }
 }

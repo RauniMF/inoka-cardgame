@@ -1,4 +1,4 @@
-import { Component, EventEmitter, inject, Output, signal } from '@angular/core';
+import { Component, EventEmitter, inject, Input, OnChanges, Output, signal, SimpleChanges } from '@angular/core';
 import { Card } from '../../card';
 import { GameService } from '../../../services/game.service';
 import { Player } from '../../player';
@@ -15,7 +15,8 @@ type HandState = 'choosing' | 'stowed' | 'display';
   styleUrl: './hand.component.css',
   imports: [CardComponent]
 })
-export class HandComponent {
+export class HandComponent implements OnChanges {
+  @Input() existingCard: Card | null = null;
   @Output() selectedCardEmitter = new EventEmitter<Card>();
 
   cards: Card[] = [];
@@ -34,6 +35,15 @@ export class HandComponent {
     this.fetchCards();
   }
 
+  ngOnChanges(changes: SimpleChanges): void {
+      if (changes['existingCard'] && changes['existingCard'].currentValue) {
+        this.handState.set('stowed');
+      }
+      else if (changes['existingCard'] && !changes['existingCard'].currentValue) {
+        this.handState.set('choosing');
+      }
+  }
+
   fetchCards(): void {
     // Get user's player data from service
     this.playerSubscription = this.gameService.player$.subscribe({
@@ -50,7 +60,7 @@ export class HandComponent {
                 const playerTransient = (game.players as Record<string, any>)[playerId];
                 if (playerTransient?.deck) {
                   this.cards = playerTransient.deck;
-                  console.log("Cards loaded: ", this.cards);
+                  // console.log("Cards loaded: ", this.cards);
                 }
               }
             },

@@ -5,6 +5,7 @@ enum CardStyle {
 }
 
 export interface Card {
+    id: string;
     style: CardStyle;
     level: number;
     maxHp: number;

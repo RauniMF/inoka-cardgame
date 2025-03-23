@@ -15,12 +15,14 @@ import { GameWebSocketService } from './services/game-websocket.service';
 import { PlaymatComponent } from './components/playmat/playmat.component';
 import { CardComponent } from './components/playmat/card/card.component';
 import { HandComponent } from './components/playmat/hand/hand.component';
+import { CommonModule } from '@angular/common';
 
 @NgModule({
   declarations: [
     AppComponent
   ],
   imports: [
+    CommonModule,
     BrowserModule,
     AppRoutingModule,
     UserComponent,

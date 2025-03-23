@@ -272,6 +272,14 @@ public class GameService {
                     Player playerTransient = game.getPlayer(player.getId());
                     game.addCardInPlay(playerId, card);
                     playerTransient.removeCardFromDeck(card);
+                    // If all players have put a card in play,
+                    // and game is currently in the DRAWING_CARDS state,
+                    // Set state to COUNT_DOWN
+                    if (game.getState() == GameState.DRAWING_CARDS) {
+                        if (game.getCardsInPlay().size() == game.getPlayers().size()) {
+                            game.setState(GameState.COUNT_DOWN);
+                        }
+                    }
                     queueGameUpdate(gameId);
                     return game;
                 }

@@ -43,6 +43,7 @@ export class GameService {
             this.findPlayer(storedUUID).subscribe({
                 next: (p) => {
                     this.playerSubject.next(p);
+                    // console.log("Player loaded: ", p);
                     if(this.playerSubject.value != undefined &&
                         this.playerSubject.value.gameId != null &&
                         this.playerSubject.value.gameId != "Not in game")
@@ -114,12 +115,13 @@ export class GameService {
     public createGame(playerId: string, passcode: string = ""): void {
         const currentPlayer = this.playerSubject.value;
         if (currentPlayer && currentPlayer.id) {
+            const headers = new HttpHeaders().set('Content-Type', 'text/plain');
             let httpObservable: Observable<string>;
             if (passcode === "") {
-                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create`, playerId, { responseType: 'text' as 'json' });
+                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create`, playerId, { headers, responseType: 'text' as 'json' });
             }
             else {
-                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create?passcode=${passcode}`, playerId, { responseType: 'text' as 'json' });
+                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create?passcode=${passcode}`, playerId, { headers, responseType: 'text' as 'json' });
             }
             httpObservable.subscribe({
                 next: (gameId) => {

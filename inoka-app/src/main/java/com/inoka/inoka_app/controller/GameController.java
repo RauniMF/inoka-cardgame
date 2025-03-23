@@ -54,7 +54,7 @@ public class GameController {
     }
     
     @GetMapping("/player/find")
-    public ResponseEntity<PlayerEntry> getPlayerById(@RequestParam String id) {
+    public ResponseEntity<PlayerEntry> getPlayerById(@RequestParam(name = "id") String id) {
         Player player = gameService.findPlayerById(id);
         if (player != null) {
             return ResponseEntity.ok(new PlayerEntry(player));
@@ -76,7 +76,7 @@ public class GameController {
     }
 
     @PutMapping("player/update")
-    public ResponseEntity<?> updatePlayer(@RequestParam String name, @RequestBody String id) {
+    public ResponseEntity<?> updatePlayer(@RequestParam(name = "name") String name, @RequestBody String id) {
         boolean updated = gameService.updatePlayer(id, name);
         if (updated) {
             return new ResponseEntity<>(HttpStatus.OK);
@@ -114,7 +114,7 @@ public class GameController {
         }
     }
 
-    @PostMapping("/game/create")
+    @PostMapping(value = "/game/create", consumes = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> createGame(@RequestParam(required = false) String passcode, @RequestBody String id) {
         Player player = gameService.findPlayerById(id);
         Game game = gameService.createGame(passcode, player);

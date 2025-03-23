@@ -49,6 +49,7 @@ app-card {
     margin: 0 -30px;
     transform-origin: bottom center;
     transition: transform 0.3s ease, z-index 0.3s ease;
+    box-shadow: 0.5vw 0.5vw 1.25vw rgba(0,0,0,0.3);
 }
 
 app-card:nth-child(1) {
