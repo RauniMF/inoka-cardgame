@@ -1,11 +1,14 @@
 <h2> Lobby </h2>
-
-<p>{{ lobbyStatus() }}</p>
-
-<ul>
-    @for (item of players; track item.name) {
-        <li>{{ item.name }}</li>
-    }
-</ul>
-
-<button (click)="toggleReady()">Ready Up</button>
+<div class="players-container">
+    <p>{{ lobbyStatus() }}</p>
+    <div class="player-entry-grid">
+        @for (player of players; track player.id; let index = $index) {
+            <div class="entry-position" [ngClass]="'position-' + (index + 1)">
+                <app-player-entry
+                    [player]="player"
+                ></app-player-entry>
+            </div>
+        }
+    </div>
+    <button class="ready-button" (click)="toggleReady()">Ready Up</button>
+</div>

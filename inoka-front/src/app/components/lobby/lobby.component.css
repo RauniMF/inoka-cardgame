@@ -1,0 +1,14 @@
+.lobby-container {
+    position: relative;
+    width: 100%;
+    height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+app-lobby-main {
+    position: relative;
+    width: 50%;
+    height: 100%;
+}

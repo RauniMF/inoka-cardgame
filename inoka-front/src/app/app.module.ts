@@ -16,6 +16,7 @@ import { PlaymatComponent } from './components/playmat/playmat.component';
 import { CardComponent } from './components/playmat/card/card.component';
 import { HandComponent } from './components/playmat/hand/hand.component';
 import { CommonModule } from '@angular/common';
+import { PlayerEntryComponent } from './components/lobby/player-entry/player-entry.component';
 
 @NgModule({
   declarations: [
@@ -31,6 +32,7 @@ import { CommonModule } from '@angular/common';
     FrontPageComponent,
     LobbyComponent,
     LobbyMainComponent,
+    PlayerEntryComponent,
     PlaymatComponent,
     CardComponent,
     HandComponent

@@ -3,12 +3,15 @@ import { GameService } from '../../services/game.service';
 import { Player } from '../player';
 import { Observable, Subscription } from 'rxjs';
 import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { PlayerEntryComponent } from './player-entry/player-entry.component';
 
 @Component({
   selector: 'app-lobby-main',
   standalone: true,
   templateUrl: './lobby-main.component.html',
-  styleUrl: './lobby-main.component.css'
+  styleUrl: './lobby-main.component.css',
+  imports: [CommonModule, PlayerEntryComponent]
 })
 export class LobbyMainComponent implements OnInit, OnDestroy {
   private router = inject(Router);
