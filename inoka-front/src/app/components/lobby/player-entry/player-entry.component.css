@@ -1,4 +1,6 @@
 .entry {
+    height: 80%;
+    width: 100%;
     display: grid;
     border: 0.15vw solid black;
     border-radius: 1vw;
@@ -8,7 +10,6 @@
 }
 
 .player-name {
-    font-size: 1.2vw;
     grid-row: 1;
     grid-column: 1;
     text-align: center;
@@ -16,7 +17,6 @@
 }
 
 .player-ready {
-    font-size: 1.2vw;
     grid-row: 1;
     grid-column: 2;
     text-align: center;

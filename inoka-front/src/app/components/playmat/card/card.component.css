@@ -1,6 +1,6 @@
 .card {
-    width: 7vw;
-    height: 10vw;
+    width: 6vw;
+    aspect-ratio: 70 / 120;
     border: 0.15vw solid black;
     border-radius: 1vw;
     text-align: center;
@@ -9,8 +9,8 @@
 }
 
 h3 {
-    font-size: 1.2vw;
+    font-size: 1vw;
 }
 p {
-    font-size: 1vw;
+    font-size: 0.9vw;
 }

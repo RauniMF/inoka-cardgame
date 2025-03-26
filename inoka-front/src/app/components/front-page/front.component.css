@@ -1,7 +1,4 @@
 body, html {
-    height: 100%;
-    margin: 0;
-    padding: 0;
     display: flex;
     flex-direction: column;
     align-items: center; 
@@ -9,7 +6,7 @@ body, html {
 
 h1 {
     margin: 10px 0;
-    font-size: 9vh;
+    font-size: 4vw;
 }
 
 .box {
@@ -18,24 +15,25 @@ h1 {
     width: 50%;
     margin-top: 2%;
     margin-left: auto;
-    font-size: 3vh;
+    font-size: 1.8vw;
 }
 
-.main {
-    margin-right: 10%
+.front-container {
+    margin-right: 10%;
+    margin-bottom: 2%;
 }
 
 label {
-    font-size: 3vh;
+    font-size: 1.8vw;
 }
 
 input {
-    font-size: 2vh;
-    height: 3vh;
-    width: 25%
+    font-size: 1.4vw;
+    height: auto;
+    width: 30%
 }
 
 button {
-    font-size: 2vh;
-    height: 3vh;
+    font-size: 1.4vw;
+    height: auto;
 }

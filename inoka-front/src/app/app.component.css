@@ -1,37 +1,32 @@
-body, html {
-    height: 100%;
+main, html, body {
+    height: calc(100% - 16px);
+    min-height: calc(100vh - 16px);
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center; 
+    overflow: hidden;
 }
 
-h1 {
-    margin: 10px 0;
-    font-size: 9vh;
+body {
+    position: fixed;
+    margin: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
-.box {
-    border: 2px solid black;
-    padding: 2%;
-    width: 50%;
-    margin-top: 2%;
-    margin-left: auto;
+h2 {
     font-size: 3vh;
+    margin: 1%;
 }
 
-label {
-    font-size: 3vh;
+*, *::before, *::after {
+    box-sizing: border-box;
 }
 
-input {
-    font-size: 2vh;
-    height: 3vh;
-    width: 25%
-}
-
-button {
-    font-size: 2vh;
-    height: 3vh;
+app-root {
+    display: block;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
 }

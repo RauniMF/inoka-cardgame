@@ -18,30 +18,47 @@
 }
 
 .hand-container.stowed {
-    position: relative;
-    left: 4vw;
-    bottom: 0vh;
+    position: absolute;
+    left: 1vw;
+    bottom: 0.5vh;
     opacity: 0.66;
-    width: 7vh;
+    width: 10vw;
+    height: 14vw;
     cursor: pointer;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
 }
+
 .hand-container.stowed app-card {
     position: absolute;
-    left: 0;
     bottom: 0;
     transform: rotate(0deg) translateY(0px);
     box-shadow: 0vw 0vw 0vw rgba(0,0,0,0);
+    z-index: 1;
 }
 
-.stowed-text {
-    position: relative;
-    left: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.7);
-    color: white;
-    padding: 2vh 4vh;
-    border-radius: 2vh;
-    font-size: 1.5vh;
+.hand-container.stowed p {
+    padding: 0;
+    margin: 0;
+    margin-top: 5%;
+    align-self: flex-start;
+    z-index: 2;
+
+    color: rgba(0,0,0,0.7);
+    font-size: 1vw;
+
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.hand-container.stowed:hover p {
+    opacity: 1;
+    visibility: visible;
 }
 
 app-card {
