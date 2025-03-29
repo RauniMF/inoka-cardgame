@@ -175,4 +175,18 @@ public class GameController {
         gameService.setGameStart(id);
         return new ResponseEntity<>(HttpStatus.OK);
     }
+
+    @PutMapping(value = "/game/clash/start", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<?> putMethodName(@RequestBody String id) {
+        boolean result = gameService.setClashStart(id);
+        if (result) return new ResponseEntity<>(HttpStatus.OK);
+        return ResponseEntity.status(403).body("Unable to set GameState to CLASH_ROLL_INIT.");
+    }
+
+    @GetMapping("player/rollinit")
+    public ResponseEntity<Integer> rollInitiativeForPlayer(@RequestParam String id) {
+        int result = gameService.rollInitForPlayer(id);
+        if (result == -1) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        return ResponseEntity.ok(result);
+    }
 }

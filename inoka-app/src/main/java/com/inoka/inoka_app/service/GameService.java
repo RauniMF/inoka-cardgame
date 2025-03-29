@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.model.Card;
+import com.inoka.inoka_app.model.CardStyle;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 import com.inoka.inoka_app.repositories.PlayerRepository;
@@ -254,6 +255,24 @@ public class GameService {
         });
     }
 
+    public boolean setClashStart(String gameId) {
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                if (game.getState() == GameState.COUNT_DOWN ||
+                    game.getState() == GameState.CLASH_CONCLUDED) {
+                        game.setState(GameState.CLASH_ROLL_INIT);
+                        // Initiative values are re-rolled at start of clash
+                        game.resetInitiativeValue();
+                        result.set(0, true);
+                        queueGameUpdate(gameId);
+                    }
+                return game;
+            }
+        });
+        return result.get(0);
+    }
 
     /*
      * Given the UUID of a player and a Card object,
@@ -288,5 +307,33 @@ public class GameService {
         } else {
             return false;
         }
+    }
+
+    public int rollInitForPlayer(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    // Players cannot share an existing initiative value
+                    do {
+                        Player playerTransient = game.getPlayer(player.getId());
+                        playerTransient.rollInitiative();
+                        Card playerCardInPlay = game.getPlayerCardInPlay(playerId);
+                        // Tricksters add their level to initiative when put in play
+                        if (playerCardInPlay != null && playerCardInPlay.getStyle() == CardStyle.TRICKSTER) {
+                            playerTransient.addToInitiative(playerCardInPlay.getLevel());
+                        }
+                        player.setInitiative(playerTransient.getInitiative());
+                    } while (!game.addPlayerInitiativeToMap(player));
+                    queueGameUpdate(gameId);
+                    return game;
+                }
+            });
+            return player.getInitiative();
+        }
+        return -1;
     }
 }

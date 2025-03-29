@@ -11,6 +11,16 @@ app-hand {
     height: calc(100vh - 20vh);
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.playmat-container p {
+    font-size: 1.3vw;
+    font-style: italic;
+    margin: 0;
 }
 
 .players-grid {

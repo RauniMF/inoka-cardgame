@@ -168,4 +168,16 @@ export class GameService {
         const gameId = this.gameSubject.value?.id;
         return this.http.put<void>(`${this.apiServerUrl}/game/start`, gameId);
     }
+
+    public startClash(): void {
+        const gameId = this.gameSubject.value?.id;
+        this.http.put<boolean>(`${this.apiServerUrl}/game/clash/start`, gameId).subscribe({
+            next: (r) => console.log(r),
+            error: (e) => console.log(e)
+        });
+    }
+
+    public rollInitForPlayer(playerId: string): Observable<number> {
+        return this.http.get<number>(`${this.apiServerUrl}/player/rollinit?id=${playerId}`)
+    }
 }

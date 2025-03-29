@@ -20,4 +20,6 @@ export interface Game {
     passcode: string;
     state: GameState;
     cardsInPlay: Map<string, Card>;
+    currentInitiativeValue: number;
+    initiativeMap: Map<number, string>;
 }

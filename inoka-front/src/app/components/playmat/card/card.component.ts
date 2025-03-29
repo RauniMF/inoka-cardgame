@@ -9,5 +9,6 @@ import { Card } from '../../card';
 })
 export class CardComponent {
   @Input() card!: Card;
+  @Input() isFlipped: boolean = true;
   isTaunter = computed(() => this.card?.style === "TRICKSTER");
 }

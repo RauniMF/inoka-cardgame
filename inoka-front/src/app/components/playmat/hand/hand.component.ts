@@ -1,4 +1,4 @@
-import { Component, EventEmitter, inject, Input, OnChanges, Output, signal, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, inject, Input, OnChanges, OnDestroy, OnInit, Output, signal, SimpleChanges } from '@angular/core';
 import { Card } from '../../card';
 import { GameService } from '../../../services/game.service';
 import { Player } from '../../player';
@@ -15,7 +15,7 @@ type HandState = 'choosing' | 'stowed' | 'display';
   styleUrl: './hand.component.css',
   imports: [CardComponent]
 })
-export class HandComponent implements OnChanges {
+export class HandComponent implements OnInit, OnDestroy, OnChanges {
   @Input() existingCard: Card | null = null;
   @Output() selectedCardEmitter = new EventEmitter<Card>();
 
@@ -33,6 +33,12 @@ export class HandComponent implements OnChanges {
 
   ngOnInit(): void {
     this.fetchCards();
+  }
+
+  ngOnDestroy(): void {
+    // Clean up subscriptions
+    this.playerSubscription?.unsubscribe();
+    this.gameSubscription?.unsubscribe();
   }
 
   ngOnChanges(changes: SimpleChanges): void {

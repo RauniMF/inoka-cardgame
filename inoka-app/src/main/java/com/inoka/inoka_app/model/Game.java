@@ -1,7 +1,11 @@
 package com.inoka.inoka_app.model;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
 import java.util.List;
@@ -14,6 +18,8 @@ public class Game {
     private GameState state;
     private Map<String, Card> cardsInPlay;
     private int addSubDice;
+    private int currentInitiativeValue;
+    private Map<Integer, String> initiativeMap;
     
     public Game() {
         this.id = UUID.randomUUID().toString();
@@ -22,6 +28,8 @@ public class Game {
         this.state = GameState.WAITING_FOR_PLAYERS;
         this.cardsInPlay = new HashMap<>();
         this.addSubDice = 6;
+        this.currentInitiativeValue = -1;
+        this.initiativeMap = new HashMap<>();
     }
 
     public Game(String passcode) {
@@ -73,9 +81,73 @@ public class Game {
     public void addCardInPlay(String playerId, Card card) {
         this.cardsInPlay.put(playerId, card);
     }
+    public Card getPlayerCardInPlay(String playerId) {
+        return this.cardsInPlay.get(playerId);
+    }
 
     public void setAddSubDice(int diceSize) {
         this.addSubDice = diceSize;
+    }
+
+    public Map<Integer, String> getInitiativeMap() {
+        return initiativeMap;
+    }
+    /*
+     * Given a player,
+     * If their initiative value is not in the map, add it and return true
+     * else return false
+     */ 
+    public boolean addPlayerInitiativeToMap(Player player) {
+        int playerInitiative = player.getInitiative();
+        String playerId = player.getId();
+        if (!this.initiativeMap.containsKey(playerInitiative)) {
+            if (this.initiativeMap.values().contains(playerId)) {
+                // Remove player's previous initiative value.
+                Iterator<Map.Entry<Integer, String>> iterator = this.initiativeMap.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<Integer, String> entry = iterator.next();
+                    if (entry.getValue().equals(playerId)) {
+                        iterator.remove();
+                    }
+                }
+            }
+            this.initiativeMap.put(playerInitiative, playerId);
+            return true;
+        }
+        return false;
+    }
+
+    public int getCurrentInitiativeValue() {
+        return currentInitiativeValue;
+    }
+    public void resetInitiativeValue() {
+        this.currentInitiativeValue = -1;
+    }
+
+    // Sets and returns the initiative value of the next player in initiative order
+    public int determineNextInitiativeValue() {
+        List<Integer> initiatives = Arrays.asList(this.initiativeMap.keySet().toArray(new Integer[0]));
+        initiatives.sort(Collections.reverseOrder());
+        int previousInitVal = this.currentInitiativeValue;
+        // Call on empty initiative map
+        if (initiatives.isEmpty()) return -1;
+        // First call after constructing Game object
+        if (previousInitVal == -1) {
+            this.currentInitiativeValue = initiatives.get(0);
+            return this.currentInitiativeValue;
+        }
+        // Previous initiative value is no longer in initiatives list
+        if (!initiatives.contains(previousInitVal)) {
+            
+        }
+        // Otherwise:
+        int nextIndex = initiatives.indexOf(previousInitVal) + 1;
+        if (nextIndex == initiatives.size()) {
+            this.currentInitiativeValue = initiatives.get(0);
+            return this.currentInitiativeValue;
+        }
+        this.currentInitiativeValue = initiatives.get(nextIndex);
+        return this.currentInitiativeValue;
     }
 
     /*

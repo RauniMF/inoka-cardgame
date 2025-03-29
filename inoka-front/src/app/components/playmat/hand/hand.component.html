@@ -14,6 +14,7 @@
         @for (card of cards; track card.id; let index = $index) {
                 <app-card
                     [card]="card"
+                    [isFlipped]="false"
                     (mouseover)="onHover(index)"
                     (mouseleave)="onHover(null)"
                     (click)="onSelectCard(card, index)"

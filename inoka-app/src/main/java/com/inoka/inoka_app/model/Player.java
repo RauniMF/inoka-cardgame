@@ -122,6 +122,9 @@ public class Player implements Serializable{
     public int getInitiative() {
         return initiative;
     }
+    public void setInitiative(int initiative) {
+        this.initiative = initiative;
+    }
     public void addToInitiative(int modifier) {
         this.initiative += modifier;
     }

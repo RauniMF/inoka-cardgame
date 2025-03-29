@@ -1,9 +1,11 @@
 <div class="playmat-container">
+    <p> {{ gameStatus() }} </p>
     <div class="players-grid" [ngClass]="'players-' + (players.length || 1)">
         <div class="player-position current-player-position">
         @if (selectedCard) {
             <app-card
                 [card]="selectedCard"
+                [isFlipped]="cardsNotRevealed"
             ></app-card>
             }
         </div>
@@ -14,6 +16,7 @@
             @if (cardsInPlay.has(player.id)) {
                 <app-card
                     [card]="cardsInPlay.get(player.id)!"
+                    [isFlipped]="cardsNotRevealed"
                 ></app-card>
             }
         </div>
