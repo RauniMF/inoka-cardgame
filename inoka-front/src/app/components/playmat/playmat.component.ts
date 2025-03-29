@@ -58,6 +58,8 @@ export class PlaymatComponent implements OnInit, OnDestroy {
                 const savedPrevState = localStorage.getItem(`game_${game.id}_prevState_${this.player?.id}`);
                 if (savedPrevState && Object.values(GameState).includes(savedPrevState as GameState)) {
                   this.prevGameState = savedPrevState as GameState;
+                  // Update visuals to represent current game state
+                  this.displayStateVisuals(this.prevGameState);
                 }
                 this.updateGameStatus();
               }
@@ -109,12 +111,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   private onStateChange(state: GameState): void {
     switch(state) {
       case GameState.DRAWING_CARDS:
-        if (this.selectedCard == null) {
-          this.gameStatus.set("Select a card to put in play.");
-        }
-        else {
-          this.gameStatus.set("Waiting for players...");
-        }
+        this.displayStateVisuals(state);
         break;
       case GameState.COUNT_DOWN:
         this.startCountdown();
@@ -125,11 +122,47 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         this.gameService.rollInitForPlayer(this.player?.id!).subscribe({
           next: (roll) => {
             this.gameStatus.set(`Rolled a ${roll} for initiative.`);
+            // Add roll to local storage
+            localStorage.setItem(`game_${this.game?.id}_initRoll_${this.player?.id}`, roll.toString());
+            this.displayStateVisuals(state);
           },
           error: (e) => console.log("Error rolling for initiative: ", e)
         });
         break;
+      case GameState.CLASH_PLAYER_TURN:
+        this.displayStateVisuals(state);
+        break;
     }
+  }
+
+  displayStateVisuals(state: GameState): void {
+    switch(state){
+      case GameState.DRAWING_CARDS:
+        if (this.selectedCard == null) {
+          this.gameStatus.set("Select a card to put in play.");
+        }
+        else {
+          this.gameStatus.set("Waiting for players...");
+        }
+        break;
+      case GameState.CLASH_ROLL_INIT:
+        this.cardsNotRevealed = false;
+        // Get player initiative roll from local storage
+        const savedInitRoll = localStorage.getItem(`game_${this.game?.id}_initRoll_${this.player?.id}`);
+        this.gameStatus.set(`Rolled a ${savedInitRoll} for initiative.`);
+        break;
+      case GameState.CLASH_PLAYER_TURN:
+        this.cardsNotRevealed = false;
+        // Determine whether it is user's turn
+        if (this.isUserTurn()) {
+          this.gameStatus.set("It's your turn.");
+        }
+        else {
+          this.gameStatus.set(`Waiting for ${this.currentPlayer()}'s decision...`);
+        }
+        break;
+    }
+
   }
 
   startCountdown(): void {
@@ -145,5 +178,25 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         this.gameService.startClash();
       }
     }, 1000);
+  }
+
+  isUserTurn(): boolean {
+    const userInit: number = +localStorage.getItem(`game_${this.game?.id}_initRoll_${this.player?.id}`)!;
+    const curInitVal = this.game?.currentInitiativeValue!
+    if (userInit == curInitVal) return true;
+    return false;
+  }
+
+  currentPlayer(): string {
+    if (!this.game || !this.game.initiativeMap) return "";
+    const initMap = new Map(Object.entries(this.game.initiativeMap));
+    const curPlayerUUID: string | undefined = initMap.get(this.game.currentInitiativeValue.toString());
+    
+    if (!curPlayerUUID) return "";
+    for (const player of this.players) {
+      if (player.id === curPlayerUUID) return player.name;
+    }
+
+    return "";
   }
 }

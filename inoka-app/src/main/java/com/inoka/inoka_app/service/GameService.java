@@ -291,9 +291,11 @@ public class GameService {
                     Player playerTransient = game.getPlayer(player.getId());
                     game.addCardInPlay(playerId, card);
                     playerTransient.removeCardFromDeck(card);
-                    // If all players have put a card in play,
-                    // and game is currently in the DRAWING_CARDS state,
-                    // Set state to COUNT_DOWN
+                    /*
+                     * If all players have put a card in play,
+                     * and game is currently in the DRAWING_CARDS state,
+                     * Set state to COUNT_DOWN
+                     */
                     if (game.getState() == GameState.DRAWING_CARDS) {
                         if (game.getCardsInPlay().size() == game.getPlayers().size()) {
                             game.setState(GameState.COUNT_DOWN);
@@ -328,6 +330,17 @@ public class GameService {
                         }
                         player.setInitiative(playerTransient.getInitiative());
                     } while (!game.addPlayerInitiativeToMap(player));
+                    /*
+                     * If all players have rolled initiative,
+                     * and game is currently in CLASH_ROLL_INIT state,
+                     * set state to CLASH_PLAYER_TURN
+                     */
+                    if (game.getState() == GameState.CLASH_ROLL_INIT) {
+                        if (game.getInitiativeMap().size() == game.getPlayers().size()) {
+                            game.setState(GameState.CLASH_PLAYER_TURN);
+                            game.determineNextInitiativeValue();
+                        }
+                    }
                     queueGameUpdate(gameId);
                     return game;
                 }

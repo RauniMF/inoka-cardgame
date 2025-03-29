@@ -173,7 +173,7 @@ export class GameService {
         const gameId = this.gameSubject.value?.id;
         this.http.put<boolean>(`${this.apiServerUrl}/game/clash/start`, gameId).subscribe({
             next: (r) => console.log(r),
-            error: (e) => console.log(e)
+            // error: (e) => console.log(e)
         });
     }
 

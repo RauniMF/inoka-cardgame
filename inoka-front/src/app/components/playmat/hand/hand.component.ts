@@ -95,7 +95,7 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
     if (this.handState() === 'stowed') {
       this.handState.set('display');
     }
-    else {
+    else if (this.handState() === 'display') {
       this.handState.set('stowed');
     }
   }

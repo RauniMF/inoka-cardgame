@@ -10,7 +10,7 @@
 
 > Update back end
 - STOMP WebSocket communication (DONE)
-- GameWebSocketController message handling
+- GameWebSocketController message handling (DONE)
 - Broadcasts using ScheduledExecutorService in GameService (Done)
 - Games map as ConcurrentHashMap + synchronized() implementation for Game object modification (Done)
 
@@ -23,10 +23,10 @@
 - Waiting screen showing players in lobby
      - Open lobby page when pressing Join Game button  (DONE)
      - Display waiting players in lobby (Done)
-           - Update players list and show their ready status
+           - Update players list and show their ready status (DONE)
      - Implement ready button (Done)
-     - Check for players present, remove them if not
-     - Show players who are ready
+     - **Check for players present, remove them if not**
+     - Show players who are ready (DONE)
      - Game starts when at least 2 players are ready (Done)
            - **Route to game page** (Done)
 
@@ -35,9 +35,10 @@
 - Game map will keep track of player decks and other attributes.
 - Show hand at start (Done)
 - Choose card (Done)
-     - Communicate with the back-end to set Card in play
-- Countdown then show all players cards
+     - Communicate with the back-end to set Card in play (Done)
+- Countdown then show all players cards (DONE)
 - Go in initiative order, player chooses move
+     - **Cooldown between actions: i.e. show player roll value for some time before moving onto next state**
 - Process the move and move onto next player
 - Process by game state
 - Develop each game state
