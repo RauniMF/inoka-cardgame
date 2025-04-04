@@ -171,8 +171,16 @@ export class GameService {
 
     public startClash(): void {
         const gameId = this.gameSubject.value?.id;
-        this.http.put<boolean>(`${this.apiServerUrl}/game/clash/start`, gameId).subscribe({
-            next: (r) => console.log(r),
+        this.http.put<void>(`${this.apiServerUrl}/game/clash/start`, gameId).subscribe({
+            next: () => {},
+            // error: (e) => console.log(e)
+        });
+    }
+
+    public clashProcessed(): void {
+        const gameId = this.gameSubject.value?.id;
+        this.http.put<void>(`${this.apiServerUrl}/game/clash/processed`, gameId).subscribe({
+            next: () => {},
             // error: (e) => console.log(e)
         });
     }

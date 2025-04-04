@@ -47,4 +47,12 @@ public class GameWebSocketController {
     
         gameService.putCardInPlay(playerId, card);
     }
+
+    @MessageMapping("/clashAction")
+    public void handleClashAction(@Payload Map<String, Object> payload) {
+        String dealingPlayerId = (String) payload.get("userId");
+        String receivingPlayerId = (String) payload.get("targetId");
+        
+        gameService.resolveClashAction(dealingPlayerId, receivingPlayerId);
+    }
 }

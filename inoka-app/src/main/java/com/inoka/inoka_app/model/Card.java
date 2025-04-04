@@ -82,11 +82,11 @@ public class Card {
     public void setCurHp(int curHp) {
         this.curHp = curHp;
     }
-    public void remCurHp(int damage) {
-        this.curHp -= damage;
+    public void removeCurHp(int damage) {
+        this.curHp = ((curHp - damage) > 0) ? curHp - damage : 0;
     }
     public void addCurHp(int healing) {
-        this.curHp += healing;
+        this.curHp = ((curHp + healing) <= maxHp) ? curHp + healing : maxHp;
     }
 
     public boolean isHasTotem() {

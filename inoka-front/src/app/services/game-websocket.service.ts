@@ -51,4 +51,14 @@ export class GameWebSocketService {
             })
         }
     }
+
+    resolveAction(userId: string, targetId: string): void {
+        if (this.stompClient && this.stompClient.connected) {
+            const message = { userId, targetId };
+            this.stompClient.publish({
+                destination: "/app/clashAction",
+                body: JSON.stringify(message)
+            })
+        }
+    }
 }

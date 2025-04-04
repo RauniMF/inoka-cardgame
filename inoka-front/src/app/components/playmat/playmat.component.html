@@ -1,4 +1,4 @@
-<div class="playmat-container">
+<div class="playmat-container" (click)="toggleDropdown($event, null)">
     <p> {{ gameStatus() }} </p>
     <div class="players-grid" [ngClass]="'players-' + (players.length || 1)">
         <div class="player-position current-player-position">
@@ -7,7 +7,12 @@
                 [card]="selectedCard"
                 [isFlipped]="cardsNotRevealed"
             ></app-card>
+            @if (userTurn) {
+                <button class="skip-turn-btn" (click)="skipTurn($event)">
+                    Skip Turn
+                </button>
             }
+        }
         </div>
     
         @for (player of otherPlayers(); track player.id; let index = $index) {
@@ -17,11 +22,20 @@
                 <app-card
                     [card]="cardsInPlay.get(player.id)!"
                     [isFlipped]="cardsNotRevealed"
+                    (click)="$event.stopPropagation(); toggleDropdown($event, player.id)"
                 ></app-card>
             }
         </div>
         }
     </div>
+    @if (dropdownData[2]) {
+        <div class="floating-dropdown" [style.left.px]="dropdownData[0]" [style.top.px]="dropdownData[1]">
+            <button
+                class="attack-btn"
+                (click)="$event.stopPropagation(); attackCard($event, selectedPlayerId!)"
+            >Attack</button>
+        </div>
+    }
 </div>
 <app-hand
     [existingCard]="selectedCard"

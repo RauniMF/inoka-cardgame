@@ -20,6 +20,7 @@ public class Game {
     private int addSubDice;
     private int currentInitiativeValue;
     private Map<Integer, String> initiativeMap;
+    private Action lastAction;
     
     public Game() {
         this.id = UUID.randomUUID().toString();
@@ -30,6 +31,7 @@ public class Game {
         this.addSubDice = 6;
         this.currentInitiativeValue = -1;
         this.initiativeMap = new HashMap<>();
+        this.lastAction = new Action();
     }
 
     public Game(String passcode) {
@@ -39,6 +41,9 @@ public class Game {
         this.state = GameState.WAITING_FOR_PLAYERS;
         this.cardsInPlay = new HashMap<>();
         this.addSubDice = 6;
+        this.currentInitiativeValue = -1;
+        this.initiativeMap = new HashMap<>();
+        this.lastAction = new Action();
     }
 
     public String getId() {
@@ -150,13 +155,19 @@ public class Game {
         return this.currentInitiativeValue;
     }
 
+    public Action getLastAction() {
+        return lastAction;
+    }
+    public void setLastAction(String dealingPlayerId, String receivingPlayerId, int damage) {
+        this.lastAction = new Action(dealingPlayerId, receivingPlayerId, damage);
+    }
     /*
      * Given the UUID of player dealing damage & UUID of player receiving damage,
      * Obtains transient Card data in cardsInPlay
      * then calculates and deals damage to receiving card,
      * storing the resulting transient Card data
      */
-    public void dealDamage(String dealingPlayerId, String receivingPlayerId) {
+    public int dealDamage(String dealingPlayerId, String receivingPlayerId) {
         Card dealingCard = this.cardsInPlay.get(dealingPlayerId);
         Card receivingCard = this.cardsInPlay.get(receivingPlayerId);
 
@@ -165,18 +176,18 @@ public class Game {
         boolean isNegative = false;
         // Attacker -> Trickster -> Defender -> Attacker
         switch(dealingCard.getStyle()) {
-            case ATTACKER: {
+            case CardStyle.ATTACKER:
                 if (receivingCard.getStyle() == CardStyle.TRICKSTER) isPositive = true;
                 if (receivingCard.getStyle() == CardStyle.DEFENDER) isNegative = true;
-            }
-            case DEFENDER: {
+                break;
+            case CardStyle.DEFENDER:
                 if (receivingCard.getStyle() == CardStyle.ATTACKER) isPositive = true;
                 if (receivingCard.getStyle() == CardStyle.TRICKSTER) isNegative = true;
-            }
-            case TRICKSTER: {
+                break;
+            case CardStyle.TRICKSTER:
                 if (receivingCard.getStyle() == CardStyle.DEFENDER) isPositive = true;
                 if (receivingCard.getStyle() == CardStyle.ATTACKER) isNegative = true;
-            }
+                break;
         }
 
         Random rand = new Random();
@@ -191,7 +202,8 @@ public class Game {
         // Cannot deal less than 0 damage
         if (damage < 0) damage = 0;
 
-        receivingCard.remCurHp(damage);
+        receivingCard.removeCurHp(damage);
         this.cardsInPlay.put(receivingPlayerId, receivingCard);
+        return damage;
     }
 }

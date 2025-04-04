@@ -36,9 +36,14 @@
 - Show hand at start (Done)
 - Choose card (Done)
      - Communicate with the back-end to set Card in play (Done)
+     - **Taunter class feature**
 - Countdown then show all players cards (DONE)
 - Go in initiative order, player chooses move
      - **Cooldown between actions: i.e. show player roll value for some time before moving onto next state**
+     - Player decision: Choose card to attack, skip turn, or forfeit from clash
 - Process the move and move onto next player
+     - Picking up a knockout: Player's card receives totem & regains d12 hp
+     - Player whose card was knocked out: Can choose to either put another card in play or forfeit from the clash
+     - Winning a clash: Be the last card standing. Winner receives a sacred stone
 - Process by game state
 - Develop each game state

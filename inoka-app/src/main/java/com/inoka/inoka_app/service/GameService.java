@@ -274,6 +274,24 @@ public class GameService {
         return result.get(0);
     }
 
+    public boolean setClashFinishedProcessing(String gameId) {
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                if (game.getState() == GameState.CLASH_PROCESSING_DECISION) {
+                    game.setState(GameState.CLASH_PLAYER_TURN);
+                    // Move onto next player's turn
+                    game.determineNextInitiativeValue();
+                    result.set(0, true);
+                    queueGameUpdate(gameId);
+                }
+                return game;
+            }
+        });
+        return result.get(0);
+    }
+
     /*
      * Given the UUID of a player and a Card object,
      * Add the card to the Map of cards in play
@@ -348,5 +366,37 @@ public class GameService {
             return player.getInitiative();
         }
         return -1;
+    }
+
+    /*
+     * Given the UUID of a player taking action on a CLASH_PLAYER_TURN,
+     * and the UUID of the player whose card was chosen to take damage,
+     * or "null" if a player chose to skip their turn,
+     * deal the damage and change GameState to CLASH_PROCESSING_DECISION,
+     * returning how much damage was dealt,
+     * or -1 if the player chose to skip their turn
+     */
+    public int resolveClashAction(String dealingPlayerId, String receivingPlayerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(dealingPlayerId);
+        final List<Integer> result = new ArrayList<>(1);
+        result.add(-1);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    if (!receivingPlayerId.equals("null")) {
+                        int damage = game.dealDamage(dealingPlayerId, receivingPlayerId);
+                        result.set(0, damage);
+                    }
+                    game.setLastAction(dealingPlayerId, receivingPlayerId, result.get(0));
+                    game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    queueGameUpdate(gameId);
+                    return game;
+                }
+            });
+        }
+        return result.get(0);
     }
 }

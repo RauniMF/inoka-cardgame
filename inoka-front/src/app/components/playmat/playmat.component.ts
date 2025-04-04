@@ -7,6 +7,10 @@ import { Subscription } from 'rxjs';
 import { Player } from '../player';
 import { CommonModule } from '@angular/common';
 import { Game, GameState } from '../game';
+import { GameWebSocketService } from '../../services/game-websocket.service';
+import { GameAction } from '../gameAction';
+
+type DropdownData = [number, number, boolean];
 
 @Component({
   selector: 'app-playmat',
@@ -24,6 +28,10 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   private prevGameState: GameState | null = null;
   // Cards put in play are flipped over (i.e not revealed)
   cardsNotRevealed = true;
+  userTurn = false;
+  // Data relevant to dynamic dropdown
+  dropdownData: DropdownData = [0, 0, false];
+  selectedPlayerId: string | null = null;
 
   public player: Player | null = null;
   private game: Game | null = null;
@@ -31,6 +39,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   private gameSubscription: Subscription | null = null;
   
   private gameService = inject(GameService);
+  private gameWebSocketService = inject(GameWebSocketService);
 
   ngOnInit(): void {
     this.fetchCardsInPlay();
@@ -56,27 +65,29 @@ export class PlaymatComponent implements OnInit, OnDestroy {
                 this.game = game;
                 // Try to retrieve the previous state from localStorage
                 const savedPrevState = localStorage.getItem(`game_${game.id}_prevState_${this.player?.id}`);
+              
+                if (game.cardsInPlay) {
+                  this.cardsInPlay = new Map(Object.entries(game.cardsInPlay));
+                  // console.log("Obtained all cards in play: ", this.cardsInPlay);
+
+                  if (this.cardsInPlay.has(playerId)) {
+                    const card : Card | undefined = this.cardsInPlay.get(playerId);
+                    if (card) {
+                      this.selectedCard = card;
+                    }
+                  }
+                }
+                if (game.players) {
+                  this.players = Array.isArray(game.players) ? game.players : Object.values(game.players);
+                  // console.log("Fetched all player data in PlaymatComponent: ", this.otherPlayers());
+                }
+
                 if (savedPrevState && Object.values(GameState).includes(savedPrevState as GameState)) {
                   this.prevGameState = savedPrevState as GameState;
                   // Update visuals to represent current game state
                   this.displayStateVisuals(this.prevGameState);
                 }
                 this.updateGameStatus();
-              }
-              if (game?.cardsInPlay) {
-                this.cardsInPlay = new Map(Object.entries(game.cardsInPlay));
-                // console.log("Obtained all cards in play: ", this.cardsInPlay);
-
-                if (this.cardsInPlay.has(playerId)) {
-                  const card : Card | undefined = this.cardsInPlay.get(playerId);
-                  if (card) {
-                    this.selectedCard = card;
-                  }
-                }
-              }
-              if (game?.players) {
-                this.players = Array.isArray(game.players) ? game.players : Object.values(game.players);
-                // console.log("Fetched all player data in PlaymatComponent: ", this.otherPlayers());
               }
             },
             error: (e) => console.log("Could not fetch Game data in playmat: ", e)
@@ -103,12 +114,10 @@ export class PlaymatComponent implements OnInit, OnDestroy {
 
       this.onStateChange(this.game?.state!);
     }
-
-    // TODO - Handle player refreshing page
-
   }
 
-  private onStateChange(state: GameState): void {
+  // Function is async, allowing us to timeout before updating visuals
+  private async onStateChange(state: GameState): Promise<void> {
     switch(state) {
       case GameState.DRAWING_CARDS:
         this.displayStateVisuals(state);
@@ -130,7 +139,21 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         });
         break;
       case GameState.CLASH_PLAYER_TURN:
+        // Wait a few seconds before changing display
+        await new Promise(resolve => setTimeout(resolve, 3000));
         this.displayStateVisuals(state);
+        break;
+      case GameState.CLASH_PROCESSING_DECISION:
+        this.userTurn = false;
+        this.interpretClashAction();
+        if (this.cardsInPlay.size != this.players.length) {
+          // If card was taken out - remove card & let player make choice
+
+        }
+        else {
+          // Let back-end know that decision was processed
+          
+        }
         break;
     }
   }
@@ -161,6 +184,10 @@ export class PlaymatComponent implements OnInit, OnDestroy {
           this.gameStatus.set(`Waiting for ${this.currentPlayer()}'s decision...`);
         }
         break;
+      case GameState.CLASH_PROCESSING_DECISION:
+        this.cardsNotRevealed = false;
+        this.interpretClashAction();
+        break;
     }
 
   }
@@ -183,7 +210,10 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   isUserTurn(): boolean {
     const userInit: number = +localStorage.getItem(`game_${this.game?.id}_initRoll_${this.player?.id}`)!;
     const curInitVal = this.game?.currentInitiativeValue!
-    if (userInit == curInitVal) return true;
+    if (userInit == curInitVal) {
+      this.userTurn = true;
+      return true;
+    }
     return false;
   }
 
@@ -191,12 +221,65 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     if (!this.game || !this.game.initiativeMap) return "";
     const initMap = new Map(Object.entries(this.game.initiativeMap));
     const curPlayerUUID: string | undefined = initMap.get(this.game.currentInitiativeValue.toString());
-    
+
     if (!curPlayerUUID) return "";
     for (const player of this.players) {
       if (player.id === curPlayerUUID) return player.name;
     }
 
     return "";
+  }
+
+  toggleDropdown(event: MouseEvent, playerId: string | null): void {
+    // Check if user turn
+    if (!this.userTurn) return;
+    if (playerId) {
+      // Clicked player to attack
+      this.dropdownData = [event.clientX, event.clientY, true];
+      this.selectedPlayerId = playerId;
+    }
+    else {
+      // Clicked off to remove dropdown
+      this.dropdownData = [0, 0, false];
+      this.selectedPlayerId = null;
+    }
+  }
+
+  attackCard(event: MouseEvent, receivingPlayerId: string): void {
+    if (!this.player || !this.userTurn) return;
+    this.gameWebSocketService.resolveAction(this.player.id, receivingPlayerId);
+    this.userTurn = false;
+    
+    // Reset dropdown data
+    this.dropdownData = [0, 0, false];
+    this.selectedPlayerId = null;
+  }
+
+  skipTurn(event: MouseEvent) {
+    event.stopPropagation();
+    if (!this.player || !this.userTurn) return;
+    this.gameWebSocketService.resolveAction(this.player.id, "null");
+    this.userTurn = false;
+
+    this.dropdownData = [0, 0, false];
+    this.selectedPlayerId = null;
+  }
+
+  interpretClashAction(): void {
+    const resolvedAction: GameAction = this.game?.lastAction!;
+    let dealingPlayerName: string = "";
+    let receivingPlayerName: string = "";
+
+    for (const player of this.players) {
+      if (player.id == resolvedAction.dealingPlayerId) dealingPlayerName = player.name;
+      if (player.id == resolvedAction.receivingPlayerId) receivingPlayerName = player.name;
+    }
+
+    if (resolvedAction.receivingPlayerId === "null") {
+      this.gameStatus.set(`${dealingPlayerName} skipped their turn.`);
+      return;
+    }
+
+    this.gameStatus.set(`${dealingPlayerName} dealt ${resolvedAction.damageDealt} damage to ${receivingPlayerName}!`)
   }
 }

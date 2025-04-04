@@ -1,3 +1,4 @@
+import { GameAction } from "./gameAction";
 import { Card } from "./card";
 import { Player } from "./player";
 
@@ -22,4 +23,5 @@ export interface Game {
     cardsInPlay: Map<string, Card>;
     currentInitiativeValue: number;
     initiativeMap: Map<number, string>;
+    lastAction: GameAction;
 }
