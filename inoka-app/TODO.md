@@ -38,12 +38,15 @@
      - Communicate with the back-end to set Card in play (Done)
      - **Taunter class feature**
 - Countdown then show all players cards (DONE)
+     - Fix clash start / clash processed raising errors (Done)
 - Go in initiative order, player chooses move
-     - **Cooldown between actions: i.e. show player roll value for some time before moving onto next state**
+     - **Cooldown between actions: i.e. show player roll value for some time before moving onto next state** (Done)
      - Player decision: Choose card to attack, skip turn, or forfeit from clash
+          - Implement forfeit option
 - Process the move and move onto next player
-     - Picking up a knockout: Player's card receives totem & regains d12 hp
+     - **Picking up a knockout: Player's card receives totem & regains d12 hp** (Done)
      - Player whose card was knocked out: Can choose to either put another card in play or forfeit from the clash
+          - Implement forfeit option
      - Winning a clash: Be the last card standing. Winner receives a sacred stone
 - Process by game state
 - Develop each game state

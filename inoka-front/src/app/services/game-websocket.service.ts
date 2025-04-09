@@ -42,6 +42,24 @@ export class GameWebSocketService {
         }
     }
 
+    startClash(gameId: string): void {
+        if (this.stompClient && this.stompClient.connected) {
+            this.stompClient.publish({
+                destination: "/app/clashStart",
+                body: gameId
+            })
+        }
+    }
+
+    clashProcessed(gameId: string): void {
+        if (this.stompClient && this.stompClient.connected) {
+            this.stompClient.publish({
+                destination: "/app/clashProcessed",
+                body: gameId
+            })
+        }
+    }
+
     playCard(playerId: string, card: Card): void {
         if (this.stompClient && this.stompClient.connected) {
             const message = { playerId, card };
@@ -58,6 +76,15 @@ export class GameWebSocketService {
             this.stompClient.publish({
                 destination: "/app/clashAction",
                 body: JSON.stringify(message)
+            })
+        }
+    }
+
+    pickedUpKnockout(playerId: string): void {
+        if (this.stompClient && this.stompClient.connected) {
+            this.stompClient.publish({
+                destination: "/app/gotKnockout",
+                body: playerId
             })
         }
     }

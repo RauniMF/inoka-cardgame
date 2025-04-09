@@ -75,7 +75,7 @@ public class GameController {
         return new ResponseEntity<>(pEntry, HttpStatus.CREATED);
     }
 
-    @PutMapping("player/update")
+    @PutMapping("/player/update")
     public ResponseEntity<?> updatePlayer(@RequestParam(name = "name") String name, @RequestBody String id) {
         boolean updated = gameService.updatePlayer(id, name);
         if (updated) {
@@ -190,10 +190,24 @@ public class GameController {
         return ResponseEntity.status(403).body("Unable to set GameState to CLASH_PLAYER_TURN.");
     }
 
-    @GetMapping("player/rollinit")
+    @GetMapping("/player/rollinit")
     public ResponseEntity<Integer> rollInitiativeForPlayer(@RequestParam String id) {
         int result = gameService.rollInitForPlayer(id);
         if (result == -1) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         return ResponseEntity.ok(result);
+    }
+
+    @DeleteMapping("/player/cardInPlay")
+    public ResponseEntity<?> removeCardInPlay(@RequestParam String id) {
+        boolean result = gameService.removePlayerCardInPlay(id);
+        if (result) return new ResponseEntity<>(HttpStatus.OK);
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
+
+    @PutMapping(value = "/player/gotKnockout", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<?> playerPickUpKnockout(@RequestBody String id) {
+        boolean result = gameService.playerPickUpKnockout(id);
+        if (result) return new ResponseEntity<>(HttpStatus.OK);
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 }

@@ -178,8 +178,9 @@ export class GameService {
     }
 
     public clashProcessed(): void {
+        const headers = new HttpHeaders().set('Content-Type', 'text/plain');
         const gameId = this.gameSubject.value?.id;
-        this.http.put<void>(`${this.apiServerUrl}/game/clash/processed`, gameId).subscribe({
+        this.http.put<void>(`${this.apiServerUrl}/game/clash/processed`, gameId, { headers, responseType: 'text' as 'json' }).subscribe({
             next: () => {},
             // error: (e) => console.log(e)
         });
@@ -187,5 +188,12 @@ export class GameService {
 
     public rollInitForPlayer(playerId: string): Observable<number> {
         return this.http.get<number>(`${this.apiServerUrl}/player/rollinit?id=${playerId}`)
+    }
+
+    public removeCardInPlay(playerId: string): void {
+        this.http.delete<void>(`${this.apiServerUrl}/player/cardInPlay?id=${playerId}`).subscribe({
+            next: () => {},
+            error: (e) => console.log("Error removing card in play: ", e)
+        });
     }
 }

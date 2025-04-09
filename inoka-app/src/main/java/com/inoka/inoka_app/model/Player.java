@@ -113,6 +113,10 @@ public class Player implements Serializable{
     public void setSacredStones(int sacredStones) {
         this.sacredStones = sacredStones;
     }
+    public int giveSacredStone() {
+        this.sacredStones += 1;
+        return this.sacredStones;
+    }
 
     public int rollInitiative() {
         Random rand = new Random();

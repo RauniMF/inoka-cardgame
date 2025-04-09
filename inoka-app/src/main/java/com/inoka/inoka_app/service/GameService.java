@@ -5,6 +5,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 
 import com.inoka.inoka_app.model.Player;
+import com.inoka.inoka_app.model.Action;
 import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.CardStyle;
 import com.inoka.inoka_app.model.Game;
@@ -319,6 +320,16 @@ public class GameService {
                             game.setState(GameState.COUNT_DOWN);
                         }
                     }
+                    /*
+                     * If a player's previous card got defeated in clash,
+                     * and they put another card in play,
+                     * update GameState from CLASH_PLAYER_REPLACING_CARD
+                     * to CLASH_PLAYER_TURN, updating initiative value
+                     */
+                    if (game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD) {
+                        game.setState(GameState.CLASH_PLAYER_TURN);
+                        game.determineNextInitiativeValue();
+                    }
                     queueGameUpdate(gameId);
                     return game;
                 }
@@ -393,6 +404,76 @@ public class GameService {
                     game.setLastAction(dealingPlayerId, receivingPlayerId, result.get(0));
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
                     queueGameUpdate(gameId);
+                    return game;
+                }
+            });
+        }
+        return result.get(0);
+    }
+
+    // Remove player's card from play
+    public boolean removePlayerCardInPlay(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    Card removedCard = game.removeCardInPlay(playerId);
+                    if (removedCard != null) {
+                        result.set(0, true);
+                        if (game.getState() == GameState.CLASH_PROCESSING_DECISION) game.setState(GameState.CLASH_PLAYER_REPLACING_CARD);
+                        queueGameUpdate(gameId);
+                    }
+                    return game;
+                }
+            });
+        }
+        return result.get(0);
+    }
+
+    /*
+     * Given the UUID of a player who picked up a knockout,
+     * give them the totem & restore 1d12 hit points to their card
+     * return true if successful, false otherwise
+     */
+    public boolean playerPickUpKnockout(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    Player playerTransient = game.getPlayer(player.getId());
+                    Action lastAction = game.getLastAction();
+                    // Verify player took action this turn
+                    if (playerId.equals(lastAction.getDealingPlayerId())) {
+                        result.set(0, true);
+                        Card playerCard = game.getPlayerCardInPlay(playerId);
+                        if (playerCard.isHasTotem() && playerCard.getStyle() == CardStyle.ATTACKER) {
+                            // Player wins clash
+                            int sacredStones = playerTransient.giveSacredStone();
+                            if (sacredStones == 3) {
+                                // Player wins game
+                                game.setState(GameState.FINISHED);
+                            }
+                            else {
+                                game.setState(GameState.CLASH_CONCLUDED);
+                            }
+                            queueGameUpdate(gameId);
+                            return game;
+                        }
+                        // Otherwise, give player's card totem & heal
+                        game.resetCardsTotem(); // Only one player can have totem
+                        game.playerGiveTotem(playerId);
+                        queueGameUpdate(gameId);
+                    }
                     return game;
                 }
             });

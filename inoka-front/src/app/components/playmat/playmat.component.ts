@@ -120,12 +120,15 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   private async onStateChange(state: GameState): Promise<void> {
     switch(state) {
       case GameState.DRAWING_CARDS:
+        //console.log("State reached: Drawing cards.")
         this.displayStateVisuals(state);
         break;
       case GameState.COUNT_DOWN:
+        //console.log("State reached: Count down.")
         this.startCountdown();
         break;
       case GameState.CLASH_ROLL_INIT:
+        //console.log("State reached: Clash Roll Initiative.")
         this.cardsNotRevealed = false;
         this.gameStatus.set("Rolling for initiative.");
         this.gameService.rollInitForPlayer(this.player?.id!).subscribe({
@@ -139,25 +142,54 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         });
         break;
       case GameState.CLASH_PLAYER_TURN:
+        //console.log("State reached: Clash Player Turn.")
         // Wait a few seconds before changing display
         await new Promise(resolve => setTimeout(resolve, 3000));
         this.displayStateVisuals(state);
         break;
       case GameState.CLASH_PROCESSING_DECISION:
+        //console.log("State reached: Clash Processing Decision.")
         this.userTurn = false;
-        this.interpretClashAction();
-        if (this.cardsInPlay.size != this.players.length) {
+        // Show choice taken / damage dealt
+        this.gameStatus.set(this.interpretClashAction());
+        // Wait a few seconds before determining next course of action
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        if (this.anyCardsOut()) {
           // If card was taken out - remove card & let player make choice
-
+          if (this.selectedCard?.curHp! <= 0) {
+            // Remove card from play
+            this.gameService.removeCardInPlay(this.player?.id!);
+          }
+          // If player took a knockout, 
+          if (this.userKnockout()) {
+            // Receive totem & regain 1d12 hit points
+            console.log("Reached 'picked up knockout'!");
+            this.gameWebSocketService.pickedUpKnockout(this.player?.id!);
+          }
         }
         else {
           // Let back-end know that decision was processed
-          
+          this.gameWebSocketService.clashProcessed(this.game!.id);
         }
+        break;
+      case GameState.CLASH_PLAYER_REPLACING_CARD:
+        //console.log("State reached: Player replacing card.")
+        if (this.selectedCard?.curHp! <= 0) {
+          // Prompt user to either play new card, or forfeit
+          this.selectedCard = null;
+          this.gameStatus.set("Put a new card in play? Or forfeit clash?");
+        }
+        else {
+          this.gameStatus.set(`${this.receivedName()} is making a decision...`);
+        }
+        break;
+      case GameState.CLASH_CONCLUDED:
+        this.gameStatus.set(`${this.dealtName()} won the clash!`);
         break;
     }
   }
 
+  // Handles player browser reset, providing updated view
   displayStateVisuals(state: GameState): void {
     switch(state){
       case GameState.DRAWING_CARDS:
@@ -186,7 +218,29 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         break;
       case GameState.CLASH_PROCESSING_DECISION:
         this.cardsNotRevealed = false;
-        this.interpretClashAction();
+        // If player card was lost, remove it
+        if (this.selectedCard?.curHp! <= 0) {
+          // Remove card from play
+          this.gameService.removeCardInPlay(this.player?.id!);
+        }
+        if (this.userKnockout() && !this.selectedCard?.hasTotem) {
+          // Receive totem & regain 1d12 hit points
+          this.gameWebSocketService.pickedUpKnockout(this.player?.id!);
+        }
+        break;
+      case GameState.CLASH_PLAYER_REPLACING_CARD:
+        this.cardsNotRevealed = false;
+        if (this.selectedCard === null) {
+          // Prompt user to either play new card, or forfeit
+          this.gameStatus.set("Put a new card in play? Or forfeit clash?");
+        }
+        else {
+          this.gameStatus.set(`${this.receivedName()} is making a decision...`);
+        }
+        break;
+      case GameState.CLASH_CONCLUDED:
+        this.cardsNotRevealed = false;
+        this.gameStatus.set(`${this.dealtName()} won the clash!`);
         break;
     }
 
@@ -202,7 +256,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
 
       if (count === 0) {
         clearInterval(interval);
-        this.gameService.startClash();
+        this.gameWebSocketService.startClash(this.game!.id);
       }
     }, 1000);
   }
@@ -265,7 +319,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     this.selectedPlayerId = null;
   }
 
-  interpretClashAction(): void {
+  interpretClashAction(): string {
     const resolvedAction: GameAction = this.game?.lastAction!;
     let dealingPlayerName: string = "";
     let receivingPlayerName: string = "";
@@ -275,11 +329,60 @@ export class PlaymatComponent implements OnInit, OnDestroy {
       if (player.id == resolvedAction.receivingPlayerId) receivingPlayerName = player.name;
     }
 
-    if (resolvedAction.receivingPlayerId === "null") {
-      this.gameStatus.set(`${dealingPlayerName} skipped their turn.`);
-      return;
+    if (resolvedAction.receivingPlayerId === "null") return `${dealingPlayerName} skipped their turn.`
+    return `${dealingPlayerName} dealt ${resolvedAction.damageDealt} damage to ${receivingPlayerName}!`
+  }
+
+  anyCardsOut(): boolean {
+    for (const card of this.cardsInPlay.values()) {
+      if (card.curHp <= 0) return true;
+    }
+    return false;
+  }
+
+  // Returns name of receivingPlayerId from previous turn action
+  receivedName(): string {
+    if (!this.game) return "";
+
+    const resolvedAction: GameAction = this.game.lastAction!;
+    let receivingPlayerName: string = "";
+
+    for (const player of this.players) {
+      if (player.id == resolvedAction.receivingPlayerId) receivingPlayerName = player.name;
     }
 
-    this.gameStatus.set(`${dealingPlayerName} dealt ${resolvedAction.damageDealt} damage to ${receivingPlayerName}!`)
+    return receivingPlayerName;
+  }
+
+  // Returns name of dealingPlayerId from previous turn action
+  dealtName(): string {
+    if (!this.game) return "";
+
+    const resolvedAction: GameAction = this.game.lastAction!;
+    let dealingPlayerName: string = "";
+
+    for (const player of this.players) {
+      if (player.id == resolvedAction.dealingPlayerId) dealingPlayerName = player.name;
+    }
+
+    return dealingPlayerName;
+  }
+
+  // Returns whether or not this user picked up a knockout in the previous action
+  userKnockout(): boolean {
+    if (!this.player || !this.game) return false;
+
+    const resolvedAction: GameAction = this.game.lastAction!;
+    // User picked up knockout if receivingPlayerId's card in play has 0 hp
+    let receivingCard: Card | undefined = this.cardsInPlay.get(resolvedAction.receivingPlayerId);
+    if (receivingCard && receivingCard.curHp > 0) return false;
+    
+    let dealingPlayerName: string = "";
+
+    for (const player of this.players) {
+      if (player.id == resolvedAction.dealingPlayerId) dealingPlayerName = player.name;
+    }
+
+    return this.player.name === dealingPlayerName;
   }
 }

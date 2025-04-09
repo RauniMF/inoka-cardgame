@@ -35,8 +35,18 @@ public class GameWebSocketController {
     }
 
     @MessageMapping("/playerReady") // Client sends message here
-    public void handlePlayerReady(String playerId) {
+    public void handlePlayerReady(@Payload String playerId) {
         gameService.setPlayerReady(playerId);
+    }
+
+    @MessageMapping("/clashStart")
+    public void handleClashStart(@Payload String gameId) {
+        gameService.setClashStart(gameId);
+    }
+
+    @MessageMapping("/clashProcessed")
+    public void handleClashProcessed(@Payload String gameId) {
+        gameService.setClashFinishedProcessing(gameId);
     }
 
     @MessageMapping("/playCard")
@@ -54,5 +64,10 @@ public class GameWebSocketController {
         String receivingPlayerId = (String) payload.get("targetId");
         
         gameService.resolveClashAction(dealingPlayerId, receivingPlayerId);
+    }
+
+    @MessageMapping("/gotKnockout")
+    public void handlePlayerPickUpKnockout(String playerId) {
+        gameService.playerPickUpKnockout(playerId);
     }
 }

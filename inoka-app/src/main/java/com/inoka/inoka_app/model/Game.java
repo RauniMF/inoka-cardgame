@@ -89,6 +89,28 @@ public class Game {
     public Card getPlayerCardInPlay(String playerId) {
         return this.cardsInPlay.get(playerId);
     }
+    public Card removeCardInPlay(String playerId) {
+        return this.cardsInPlay.remove(playerId);
+    }
+    // Removes totem from any cards in play
+    public void resetCardsTotem() {
+        for (String playerUUID : this.cardsInPlay.keySet()) {
+            Card card = this.cardsInPlay.get(playerUUID);
+            if (card.isHasTotem()) {
+                card.takeTotem();
+                this.cardsInPlay.put(playerUUID, card);
+            }
+        }
+    }
+    // Gives totem to player's card (heals card as well)
+    public void playerGiveTotem(String playerId) {
+        Card card = this.cardsInPlay.get(playerId);
+        card.giveTotem();
+        // Heal card
+        Random rand = new Random();
+        card.addCurHp(rand.nextInt(12) + 1);
+        this.cardsInPlay.put(playerId, card);
+    }
 
     public void setAddSubDice(int diceSize) {
         this.addSubDice = diceSize;
