@@ -43,10 +43,13 @@
      - **Cooldown between actions: i.e. show player roll value for some time before moving onto next state** (Done)
      - Player decision: Choose card to attack, skip turn, or forfeit from clash
           - Implement forfeit option
+               - Remove player card & display they've chosen to forfeit on the following CLASH_PROCESSING_DECISION
 - Process the move and move onto next player
      - **Picking up a knockout: Player's card receives totem & regains d12 hp** (Done)
      - Player whose card was knocked out: Can choose to either put another card in play or forfeit from the clash
           - Implement forfeit option
+               - Remove player card & remove them from initiative order
+               - **Display player chose to forfeit on front-end**
      - Winning a clash: Be the last card standing. Winner receives a sacred stone
 - Process by game state
 - Develop each game state

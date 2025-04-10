@@ -67,7 +67,12 @@ public class GameWebSocketController {
     }
 
     @MessageMapping("/gotKnockout")
-    public void handlePlayerPickUpKnockout(String playerId) {
+    public void handlePlayerPickUpKnockout(@Payload String playerId) {
         gameService.playerPickUpKnockout(playerId);
+    }
+
+    @MessageMapping("/clashForfeit")
+    public void handlePlayerForfeitClash(@Payload String playerId) {
+        gameService.playerForfeitClash(playerId);
     }
 }

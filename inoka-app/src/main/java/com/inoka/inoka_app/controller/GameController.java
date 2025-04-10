@@ -210,4 +210,11 @@ public class GameController {
         if (result) return new ResponseEntity<>(HttpStatus.OK);
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
+
+    @PutMapping(value = "/player/wonClash", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<?> playerWonClash(@RequestBody String id) {
+        boolean result = gameService.playerWonClash(id);
+        if (result) return new ResponseEntity<>(HttpStatus.OK);
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
 }

@@ -13,12 +13,15 @@ import java.util.UUID;
 
 public class Game {
     private String id;
+    // Player UUID --> Player object
     private Map<String, Player> players;
     private String passcode;
     private GameState state;
+    // Player UUID --> Player Card
     private Map<String, Card> cardsInPlay;
     private int addSubDice;
     private int currentInitiativeValue;
+    // Initiative Value --> Player UUID
     private Map<Integer, String> initiativeMap;
     private Action lastAction;
     
@@ -142,6 +145,27 @@ public class Game {
             return true;
         }
         return false;
+    }
+
+    /*
+     * Given a player,
+     * remove their initiative value from the map
+     * and return its value, or -1 if player not present
+     */
+    public int removePlayerFromInitiative(Player player) {
+        String playerId = player.getId();
+        int result = -1;
+
+        Iterator<Map.Entry<Integer, String>> iterator = this.initiativeMap.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Integer, String> entry = iterator.next();
+            if (entry.getValue().equals(playerId)) {
+                result = entry.getKey();
+                iterator.remove();
+            }
+        }
+
+        return result;
     }
 
     public int getCurrentInitiativeValue() {

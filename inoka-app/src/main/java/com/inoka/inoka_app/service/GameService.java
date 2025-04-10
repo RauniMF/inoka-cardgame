@@ -480,4 +480,76 @@ public class GameService {
         }
         return result.get(0);
     }
+
+    /*
+     * Given a player's UUID,
+     * discard their card in play
+     * and remove them from the initiative order
+     */
+    public void playerForfeitClash(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    // Remove card in play
+                    if (!game.getCardsInPlay().containsKey(playerId)) return game;
+                    game.removeCardInPlay(playerId);
+                    // Handle initiative order
+                    if (game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD) {
+                        // Forfeit after being knocked out: remove from initiative order
+                        game.removePlayerFromInitiative(player);
+                    }
+                    else {
+                        // Forfeit during turn: remove from order then update lastAction
+                        game.removePlayerFromInitiative(player);
+                        // Update game state & last action
+                        game.setLastAction("null", playerId, -1);
+                        game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    }
+                    queueGameUpdate(gameId);
+                    return game;
+                }
+            });
+        }
+    }
+
+    /*
+     * Given a player's UUID,
+     * verify that they've won the clash,
+     * then award them if they won
+     */
+    public boolean playerWonClash(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    Player playerTransient = game.getPlayer(player.getId());
+                    if(game.getCardsInPlay().size() == 1 && game.getPlayerCardInPlay(playerId) != null) {
+                        int sacredStones = playerTransient.giveSacredStone();
+                        if (sacredStones == 3) {
+                            // Player wins game
+                            game.setState(GameState.FINISHED);
+                        }
+                        else {
+                            game.setState(GameState.CLASH_CONCLUDED);
+                        }
+                        result.set(0, true);
+                        queueGameUpdate(gameId);
+                    }
+                    return game;
+                }
+            });
+        }
+
+        return result.get(0);
+    }
 }

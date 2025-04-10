@@ -21,7 +21,8 @@ type DropdownData = [number, number, boolean];
 })
 export class PlaymatComponent implements OnInit, OnDestroy {
   @Input() selectedCard: Card | null = null;
-  
+  handSuppressed: boolean = false;
+
   players: Player[] = [];
   cardsInPlay: Map<string, Card> = new Map();
   gameStatus = signal("");
@@ -75,6 +76,8 @@ export class PlaymatComponent implements OnInit, OnDestroy {
                     if (card) {
                       this.selectedCard = card;
                     }
+                    // If player has forfeited from clash, or clash is concluded, suppress hand component
+
                   }
                 }
                 if (game.players) {
@@ -145,7 +148,14 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         //console.log("State reached: Clash Player Turn.")
         // Wait a few seconds before changing display
         await new Promise(resolve => setTimeout(resolve, 3000));
-        this.displayStateVisuals(state);
+        // If user is last player standing, they win
+        if (this.lastPlayer()) {
+          console.log("Last player check reached.");
+          this.gameService.playerWonClash(this.player?.id!);
+        }
+        else {
+          this.displayStateVisuals(state);
+        }
         break;
       case GameState.CLASH_PROCESSING_DECISION:
         //console.log("State reached: Clash Processing Decision.")
@@ -184,7 +194,13 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         }
         break;
       case GameState.CLASH_CONCLUDED:
-        this.gameStatus.set(`${this.dealtName()} won the clash!`);
+        /*
+         * If a player is prompted to choose a new card while a clashis concluded,
+         * suppress ability to choose new card
+        */
+        this.handSuppressed = true;
+        if (this.selectedCard?.curHp! <= 0) this.selectedCard = null;
+        this.gameStatus.set(`${this.winnerName()} won the clash!`);
         break;
     }
   }
@@ -240,7 +256,8 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         break;
       case GameState.CLASH_CONCLUDED:
         this.cardsNotRevealed = false;
-        this.gameStatus.set(`${this.dealtName()} won the clash!`);
+        this.handSuppressed = true;
+        this.gameStatus.set(`${this.winnerName()} won the clash!`);
         break;
     }
 
@@ -264,7 +281,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   isUserTurn(): boolean {
     const userInit: number = +localStorage.getItem(`game_${this.game?.id}_initRoll_${this.player?.id}`)!;
     const curInitVal = this.game?.currentInitiativeValue!
-    if (userInit == curInitVal) {
+    if (this.game && this.game.state === GameState.CLASH_PLAYER_TURN && userInit == curInitVal) {
       this.userTurn = true;
       return true;
     }
@@ -284,7 +301,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     return "";
   }
 
-  toggleDropdown(event: MouseEvent, playerId: string | null): void {
+  toggleDropdown(event: MouseEvent, playerId: string | undefined): void {
     // Check if user turn
     if (!this.userTurn) return;
     if (playerId) {
@@ -319,6 +336,17 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     this.selectedPlayerId = null;
   }
 
+  forfeitFromClash(): void {
+    if(!this.player || !this.userTurn) return;
+    this.gameWebSocketService.playerForfeitClash(this.player.id);
+    this.userTurn = false;
+
+    this.handSuppressed = true;
+    this.selectedCard = null;
+    this.dropdownData = [0, 0, false];
+    this.selectedPlayerId = null;
+  }
+
   interpretClashAction(): string {
     const resolvedAction: GameAction = this.game?.lastAction!;
     let dealingPlayerName: string = "";
@@ -329,6 +357,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
       if (player.id == resolvedAction.receivingPlayerId) receivingPlayerName = player.name;
     }
 
+    if (resolvedAction.dealingPlayerId === "null") return `${receivingPlayerName} forfeited from the clash.`
     if (resolvedAction.receivingPlayerId === "null") return `${dealingPlayerName} skipped their turn.`
     return `${dealingPlayerName} dealt ${resolvedAction.damageDealt} damage to ${receivingPlayerName}!`
   }
@@ -354,9 +383,18 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     return receivingPlayerName;
   }
 
-  // Returns name of dealingPlayerId from previous turn action
-  dealtName(): string {
+  // Returns name of dealingPlayerId from previous turn action or last player remaining
+  winnerName(): string {
     if (!this.game) return "";
+    // Last player remaining
+    if (this.cardsInPlay.size == 1) {
+      const winnerUUID: string = this.cardsInPlay.keys().next().value!;
+      for (const player of this.players) {
+        if (player.id == winnerUUID) return player.name;
+      }
+    }
+
+    // Player picked up knockout with Attacker to win clash
 
     const resolvedAction: GameAction = this.game.lastAction!;
     let dealingPlayerName: string = "";
@@ -373,6 +411,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     if (!this.player || !this.game) return false;
 
     const resolvedAction: GameAction = this.game.lastAction!;
+    if (resolvedAction.damageDealt < 0) return false;
     // User picked up knockout if receivingPlayerId's card in play has 0 hp
     let receivingCard: Card | undefined = this.cardsInPlay.get(resolvedAction.receivingPlayerId);
     if (receivingCard && receivingCard.curHp > 0) return false;
@@ -384,5 +423,10 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     }
 
     return this.player.name === dealingPlayerName;
+  }
+
+  lastPlayer(): boolean {
+    if (!this.player || this.cardsInPlay.size > 1) return false
+    return this.cardsInPlay.has(this.player.id);
   }
 }

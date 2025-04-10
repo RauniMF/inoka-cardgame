@@ -88,4 +88,13 @@ export class GameWebSocketService {
             })
         }
     }
+
+    playerForfeitClash(playerId: string): void {
+        if (this.stompClient && this.stompClient.connected) {
+            this.stompClient.publish({
+                destination: "/app/clashForfeit",
+                body: playerId
+            })
+        }
+    }
 }

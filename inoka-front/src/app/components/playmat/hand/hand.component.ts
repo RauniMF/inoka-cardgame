@@ -17,6 +17,7 @@ type HandState = 'choosing' | 'stowed' | 'display';
 })
 export class HandComponent implements OnInit, OnDestroy, OnChanges {
   @Input() existingCard: Card | null = null;
+  @Input() suppressChoosing: boolean = false;
   @Output() selectedCardEmitter = new EventEmitter<Card>();
 
   cards: Card[] = [];
@@ -42,7 +43,7 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-      if (changes['existingCard'] && changes['existingCard'].currentValue) {
+      if (this.suppressChoosing || (changes['existingCard'] && changes['existingCard'].currentValue)) {
         this.handState.set('stowed');
       }
       else if (changes['existingCard'] && !changes['existingCard'].currentValue) {

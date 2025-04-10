@@ -196,4 +196,12 @@ export class GameService {
             error: (e) => console.log("Error removing card in play: ", e)
         });
     }
+
+    public playerWonClash(playerId: string): void{
+        const headers = new HttpHeaders().set('Content-Type', 'text/plain');
+        this.http.put<void>(`${this.apiServerUrl}/player/wonClash`, playerId, { headers }).subscribe({
+            next: () => {},
+            error: (e) => console.log("Error checking if player won: ", e)
+        });
+    }
 }

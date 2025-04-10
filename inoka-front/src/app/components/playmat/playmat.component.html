@@ -1,4 +1,4 @@
-<div class="playmat-container" (click)="toggleDropdown($event, null)">
+<div class="playmat-container" (click)="toggleDropdown($event, undefined)">
     <p> {{ gameStatus() }} </p>
     <div class="players-grid" [ngClass]="'players-' + (players.length || 1)">
         <div class="player-position current-player-position">
@@ -6,6 +6,7 @@
             <app-card
                 [card]="selectedCard"
                 [isFlipped]="cardsNotRevealed"
+                (click)="$event.stopPropagation(); toggleDropdown($event, this.player?.id)"
             ></app-card>
             @if (userTurn) {
                 <button class="skip-turn-btn" (click)="skipTurn($event)">
@@ -29,15 +30,26 @@
         }
     </div>
     @if (dropdownData[2]) {
+        @if (selectedPlayerId != this.player?.id) {
         <div class="floating-dropdown" [style.left.px]="dropdownData[0]" [style.top.px]="dropdownData[1]">
             <button
                 class="attack-btn"
                 (click)="$event.stopPropagation(); attackCard($event, selectedPlayerId!)"
             >Attack</button>
         </div>
+        }
+        @else {
+        <div class="floating-dropdown" [style.left.px]="dropdownData[0]" [style.top.px]="dropdownData[1]">
+            <button
+                class="attack-btn"
+                (click)="$event.stopPropagation(); forfeitFromClash()"
+            >Forfeit</button>
+        </div>
+        }
     }
 </div>
 <app-hand
     [existingCard]="selectedCard"
+    [suppressChoosing]="handSuppressed"
     (selectedCardEmitter)="selectedCard = $event"
 />
