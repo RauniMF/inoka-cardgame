@@ -2,6 +2,11 @@
     <p> {{ gameStatus() }} </p>
     <div class="players-grid" [ngClass]="'players-' + (players.length || 1)">
         <div class="player-position current-player-position">
+        @if (isForfeitButtonPresent()) {
+            <button class="forfeit-btn" (click)="$event.stopPropagation(); forfeitFromClash()">
+                Forfeit
+            </button>
+        }
         @if (selectedCard) {
             <app-card
                 [card]="selectedCard"

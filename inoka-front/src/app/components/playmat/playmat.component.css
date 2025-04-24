@@ -207,3 +207,13 @@ app-hand {
   text-align: center;
   margin: 1%;
 }
+
+.forfeit-btn {
+  /* TODO - Fix placement on page */
+  width: 4vw;
+  height: auto;
+  font-size: 0.8vw;
+  white-space: nowrap;
+  text-align: center;
+  margin: 1%;
+}

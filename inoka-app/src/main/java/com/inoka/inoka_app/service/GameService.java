@@ -496,20 +496,14 @@ public class GameService {
             games.computeIfPresent(gameId, (id, game) -> {
                 synchronized (game) {
                     // Remove card in play
-                    if (!game.getCardsInPlay().containsKey(playerId)) return game;
+                    if (!game.getCardsInPlay().containsKey(playerId) && !(game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD)) return game;
                     game.removeCardInPlay(playerId);
                     // Handle initiative order
-                    if (game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD) {
-                        // Forfeit after being knocked out: remove from initiative order
-                        game.removePlayerFromInitiative(player);
-                    }
-                    else {
-                        // Forfeit during turn: remove from order then update lastAction
-                        game.removePlayerFromInitiative(player);
-                        // Update game state & last action
-                        game.setLastAction("null", playerId, -1);
-                        game.setState(GameState.CLASH_PROCESSING_DECISION);
-                    }
+                    // Forfeit during turn: remove from order then update lastAction
+                    game.removePlayerFromInitiative(player);
+                    // Update game state & last action
+                    game.setLastAction("null", playerId, -1);
+                    game.setState(GameState.CLASH_PROCESSING_DECISION);
                     queueGameUpdate(gameId);
                     return game;
                 }

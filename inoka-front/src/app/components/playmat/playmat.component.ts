@@ -145,7 +145,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         });
         break;
       case GameState.CLASH_PLAYER_TURN:
-        //console.log("State reached: Clash Player Turn.")
+        // console.log("State reached: Clash Player Turn.")
         // Wait a few seconds before changing display
         await new Promise(resolve => setTimeout(resolve, 3000));
         // If user is last player standing, they win
@@ -173,7 +173,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
           // If player took a knockout, 
           if (this.userKnockout()) {
             // Receive totem & regain 1d12 hit points
-            console.log("Reached 'picked up knockout'!");
+            // console.log("Reached 'picked up knockout'!");
             this.gameWebSocketService.pickedUpKnockout(this.player?.id!);
           }
         }
@@ -195,7 +195,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         break;
       case GameState.CLASH_CONCLUDED:
         /*
-         * If a player is prompted to choose a new card while a clashis concluded,
+         * If a player is prompted to choose a new card while a clash is concluded,
          * suppress ability to choose new card
         */
         this.handSuppressed = true;
@@ -337,7 +337,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   }
 
   forfeitFromClash(): void {
-    if(!this.player || !this.userTurn) return;
+    if(!this.player || (!this.userTurn && !this.isForfeitButtonPresent())) return;
     this.gameWebSocketService.playerForfeitClash(this.player.id);
     this.userTurn = false;
 
@@ -428,5 +428,10 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   lastPlayer(): boolean {
     if (!this.player || this.cardsInPlay.size > 1) return false
     return this.cardsInPlay.has(this.player.id);
+  }
+
+  isForfeitButtonPresent(): boolean {
+    if (!this.game || this.handSuppressed) return false;
+    return (this.game.state == GameState.CLASH_PLAYER_REPLACING_CARD) && !this.selectedCard
   }
 }
