@@ -14,6 +14,12 @@ const routes: Routes = [
     loadComponent: () => {
       return import('./components/lobby/lobby.component').then((m) => m.LobbyComponent)
     }
+  },
+  {
+    path: 'game',
+    loadComponent: () => {
+      return import('./components/playmat/playmat.component').then((m) => m.PlaymatComponent)
+    }
   }
 ];
 

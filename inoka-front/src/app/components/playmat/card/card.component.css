@@ -1,0 +1,21 @@
+.card {
+    width: 6vw;
+    aspect-ratio: 70 / 120;
+    border: 0.15vw solid black;
+    border-radius: 1vw;
+    text-align: center;
+    background-color: white;
+    padding: 0.75vw;
+}
+
+.card-back p {
+    font-size: 0.9vw;
+    color: white;
+}
+
+h3 {
+    font-size: 1vw;
+}
+p {
+    font-size: 0.9vw;
+}

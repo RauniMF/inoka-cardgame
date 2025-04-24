@@ -1,0 +1,24 @@
+.entry {
+    height: 80%;
+    width: 100%;
+    display: grid;
+    border: 0.15vw solid black;
+    border-radius: 1vw;
+    position: relative;
+    grid-template-rows: 1fr;
+    grid-template-columns: 1fr 1fr;
+}
+
+.player-name {
+    grid-row: 1;
+    grid-column: 1;
+    text-align: center;
+    align-content: center;
+}
+
+.player-ready {
+    grid-row: 1;
+    grid-column: 2;
+    text-align: center;
+    align-content: center;
+}

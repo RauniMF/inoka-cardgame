@@ -5,7 +5,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 
 import com.inoka.inoka_app.model.Player;
+import com.inoka.inoka_app.model.Action;
 import com.inoka.inoka_app.model.Card;
+import com.inoka.inoka_app.model.CardStyle;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 import com.inoka.inoka_app.repositories.PlayerRepository;
@@ -180,17 +182,17 @@ public class GameService {
      * Return a List of players in game
      */
     public Optional<List<Player>> getPlayersInGame(String gameId) {
-        Game game = this.getGame(gameId);
+        // Mutable object you can modify inside lambda expression
+        final List<Optional<List<Player>>> result = new ArrayList<>(1);
+        result.add(Optional.empty());
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                result.set(0, Optional.of(new ArrayList<>(game.getPlayers().values())));
+                return game;
+            }
+        });
 
-        if (game == null) {
-            return Optional.empty();
-        }
-
-        if (game.getPlayers().isEmpty()) {
-            return Optional.empty();
-        }
-
-        return Optional.of(new ArrayList<>(game.getPlayers().values()));
+        return result.get(0);
     }
 
     /*
@@ -237,5 +239,311 @@ public class GameService {
         for (Player player : playersCheck.get()) if(!player.isReady()) return Optional.of(false);
 
         return Optional.of(true);
+    }
+
+    /*
+     * Given the UUID of a game,
+     * set the GameState to DRAWING_CARDS
+     * and queue broadcast
+     */
+    public void setGameStart(String gameId) {
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                game.setState(GameState.DRAWING_CARDS);
+                queueGameUpdate(gameId);
+                return game;
+            }
+        });
+    }
+
+    public boolean setClashStart(String gameId) {
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                if (game.getState() == GameState.COUNT_DOWN ||
+                    game.getState() == GameState.CLASH_CONCLUDED) {
+                        game.setState(GameState.CLASH_ROLL_INIT);
+                        // Initiative values are re-rolled at start of clash
+                        game.resetInitiativeValue();
+                        result.set(0, true);
+                        queueGameUpdate(gameId);
+                    }
+                return game;
+            }
+        });
+        return result.get(0);
+    }
+
+    public boolean setClashFinishedProcessing(String gameId) {
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                if (game.getState() == GameState.CLASH_PROCESSING_DECISION) {
+                    game.setState(GameState.CLASH_PLAYER_TURN);
+                    // Move onto next player's turn
+                    game.determineNextInitiativeValue();
+                    result.set(0, true);
+                    queueGameUpdate(gameId);
+                }
+                return game;
+            }
+        });
+        return result.get(0);
+    }
+
+    /*
+     * Given the UUID of a player and a Card object,
+     * Add the card to the Map of cards in play
+     * in the game the player is in
+     * Returns true if successful, false otherwise
+     */
+    public boolean putCardInPlay(String playerId, Card card) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    Player playerTransient = game.getPlayer(player.getId());
+                    game.addCardInPlay(playerId, card);
+                    playerTransient.removeCardFromDeck(card);
+                    /*
+                     * If all players have put a card in play,
+                     * and game is currently in the DRAWING_CARDS state,
+                     * Set state to COUNT_DOWN
+                     */
+                    if (game.getState() == GameState.DRAWING_CARDS) {
+                        if (game.getCardsInPlay().size() == game.getPlayers().size()) {
+                            game.setState(GameState.COUNT_DOWN);
+                        }
+                    }
+                    /*
+                     * If a player's previous card got defeated in clash,
+                     * and they put another card in play,
+                     * update GameState from CLASH_PLAYER_REPLACING_CARD
+                     * to CLASH_PLAYER_TURN, updating initiative value
+                     */
+                    if (game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD) {
+                        game.setState(GameState.CLASH_PLAYER_TURN);
+                        game.determineNextInitiativeValue();
+                    }
+                    queueGameUpdate(gameId);
+                    return game;
+                }
+            });
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public int rollInitForPlayer(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    // Players cannot share an existing initiative value
+                    do {
+                        Player playerTransient = game.getPlayer(player.getId());
+                        playerTransient.rollInitiative();
+                        Card playerCardInPlay = game.getPlayerCardInPlay(playerId);
+                        // Tricksters add their level to initiative when put in play
+                        if (playerCardInPlay != null && playerCardInPlay.getStyle() == CardStyle.TRICKSTER) {
+                            playerTransient.addToInitiative(playerCardInPlay.getLevel());
+                        }
+                        player.setInitiative(playerTransient.getInitiative());
+                    } while (!game.addPlayerInitiativeToMap(player));
+                    /*
+                     * If all players have rolled initiative,
+                     * and game is currently in CLASH_ROLL_INIT state,
+                     * set state to CLASH_PLAYER_TURN
+                     */
+                    if (game.getState() == GameState.CLASH_ROLL_INIT) {
+                        if (game.getInitiativeMap().size() == game.getPlayers().size()) {
+                            game.setState(GameState.CLASH_PLAYER_TURN);
+                            game.determineNextInitiativeValue();
+                        }
+                    }
+                    queueGameUpdate(gameId);
+                    return game;
+                }
+            });
+            return player.getInitiative();
+        }
+        return -1;
+    }
+
+    /*
+     * Given the UUID of a player taking action on a CLASH_PLAYER_TURN,
+     * and the UUID of the player whose card was chosen to take damage,
+     * or "null" if a player chose to skip their turn,
+     * deal the damage and change GameState to CLASH_PROCESSING_DECISION,
+     * returning how much damage was dealt,
+     * or -1 if the player chose to skip their turn
+     */
+    public int resolveClashAction(String dealingPlayerId, String receivingPlayerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(dealingPlayerId);
+        final List<Integer> result = new ArrayList<>(1);
+        result.add(-1);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    if (!receivingPlayerId.equals("null")) {
+                        int damage = game.dealDamage(dealingPlayerId, receivingPlayerId);
+                        result.set(0, damage);
+                    }
+                    game.setLastAction(dealingPlayerId, receivingPlayerId, result.get(0));
+                    game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    queueGameUpdate(gameId);
+                    return game;
+                }
+            });
+        }
+        return result.get(0);
+    }
+
+    // Remove player's card from play
+    public boolean removePlayerCardInPlay(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    Card removedCard = game.removeCardInPlay(playerId);
+                    if (removedCard != null) {
+                        result.set(0, true);
+                        if (game.getState() == GameState.CLASH_PROCESSING_DECISION) game.setState(GameState.CLASH_PLAYER_REPLACING_CARD);
+                        queueGameUpdate(gameId);
+                    }
+                    return game;
+                }
+            });
+        }
+        return result.get(0);
+    }
+
+    /*
+     * Given the UUID of a player who picked up a knockout,
+     * give them the totem & restore 1d12 hit points to their card
+     * return true if successful, false otherwise
+     */
+    public boolean playerPickUpKnockout(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    Player playerTransient = game.getPlayer(player.getId());
+                    Action lastAction = game.getLastAction();
+                    // Verify player took action this turn
+                    if (playerId.equals(lastAction.getDealingPlayerId())) {
+                        result.set(0, true);
+                        Card playerCard = game.getPlayerCardInPlay(playerId);
+                        if (playerCard.isHasTotem() && playerCard.getStyle() == CardStyle.ATTACKER) {
+                            // Player wins clash
+                            int sacredStones = playerTransient.giveSacredStone();
+                            if (sacredStones == 3) {
+                                // Player wins game
+                                game.setState(GameState.FINISHED);
+                            }
+                            else {
+                                game.setState(GameState.CLASH_CONCLUDED);
+                            }
+                            queueGameUpdate(gameId);
+                            return game;
+                        }
+                        // Otherwise, give player's card totem & heal
+                        game.resetCardsTotem(); // Only one player can have totem
+                        game.playerGiveTotem(playerId);
+                        queueGameUpdate(gameId);
+                    }
+                    return game;
+                }
+            });
+        }
+        return result.get(0);
+    }
+
+    /*
+     * Given a player's UUID,
+     * discard their card in play
+     * and remove them from the initiative order
+     */
+    public void playerForfeitClash(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    // Remove card in play
+                    if (!game.getCardsInPlay().containsKey(playerId) && !(game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD)) return game;
+                    game.removeCardInPlay(playerId);
+                    // Handle initiative order
+                    // Forfeit during turn: remove from order then update lastAction
+                    game.removePlayerFromInitiative(player);
+                    // Update game state & last action
+                    game.setLastAction("null", playerId, -1);
+                    game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    queueGameUpdate(gameId);
+                    return game;
+                }
+            });
+        }
+    }
+
+    /*
+     * Given a player's UUID,
+     * verify that they've won the clash,
+     * then award them if they won
+     */
+    public boolean playerWonClash(String playerId) {
+        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        if (playerCheck.isPresent()) {
+            Player player = playerCheck.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    Player playerTransient = game.getPlayer(player.getId());
+                    if(game.getCardsInPlay().size() == 1 && game.getPlayerCardInPlay(playerId) != null) {
+                        int sacredStones = playerTransient.giveSacredStone();
+                        if (sacredStones == 3) {
+                            // Player wins game
+                            game.setState(GameState.FINISHED);
+                        }
+                        else {
+                            game.setState(GameState.CLASH_CONCLUDED);
+                        }
+                        result.set(0, true);
+                        queueGameUpdate(gameId);
+                    }
+                    return game;
+                }
+            });
+        }
+
+        return result.get(0);
     }
 }

@@ -1,10 +1,11 @@
 enum CardStyle {
-    ATTACKER,
-    DEFENDER,
-    TRICKSTER
+    ATTACKER = "ATTACKER",
+    DEFENDER = "DEFENDER",
+    TRICKSTER = "TRICKSTER"
 }
 
 export interface Card {
+    id: string;
     style: CardStyle;
     level: number;
     maxHp: number;

@@ -27,7 +27,7 @@ export class GameService {
 
         this.gameWebSocketService.gameUpdates$.subscribe((updatedGame: Game | null) => {
             if (updatedGame) {
-                console.log("Game update received via WebSocket: ", updatedGame);
+                // console.log("Game update received via WebSocket: ", updatedGame);
                 this.gameSubject.next(updatedGame);
             }
         });
@@ -43,6 +43,7 @@ export class GameService {
             this.findPlayer(storedUUID).subscribe({
                 next: (p) => {
                     this.playerSubject.next(p);
+                    // console.log("Player loaded: ", p);
                     if(this.playerSubject.value != undefined &&
                         this.playerSubject.value.gameId != null &&
                         this.playerSubject.value.gameId != "Not in game")
@@ -56,7 +57,7 @@ export class GameService {
         }
     }
     private createNewPlayer(): void {
-        const newPlayer: Player = { name: "", id: "" };
+        const newPlayer: Player = { name: "", id: "", ready: false };
         this.addPlayer(newPlayer).subscribe({
             next: (p) => {
                 localStorage.setItem('userUUID', p.id);
@@ -114,12 +115,13 @@ export class GameService {
     public createGame(playerId: string, passcode: string = ""): void {
         const currentPlayer = this.playerSubject.value;
         if (currentPlayer && currentPlayer.id) {
+            const headers = new HttpHeaders().set('Content-Type', 'text/plain');
             let httpObservable: Observable<string>;
             if (passcode === "") {
-                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create`, playerId, { responseType: 'text' as 'json' });
+                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create`, playerId, { headers, responseType: 'text' as 'json' });
             }
             else {
-                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create?passcode=${passcode}`, playerId, { responseType: 'text' as 'json' });
+                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create?passcode=${passcode}`, playerId, { headers, responseType: 'text' as 'json' });
             }
             httpObservable.subscribe({
                 next: (gameId) => {
@@ -158,7 +160,48 @@ export class GameService {
         return this.http.put(`${this.apiServerUrl}/player/ready`, playerId, { headers, responseType: 'text' as 'json' }) as Observable<string>;
     }
 
-    public allPlayersReady(gameId: String): Observable<Boolean> {
+    public allPlayersReady(gameId: string): Observable<Boolean> {
         return this.http.get<Boolean>(`${this.apiServerUrl}/game/ready?id=${gameId}`);
+    }
+
+    public startGame(): Observable<void> {
+        const gameId = this.gameSubject.value?.id;
+        return this.http.put<void>(`${this.apiServerUrl}/game/start`, gameId);
+    }
+
+    public startClash(): void {
+        const gameId = this.gameSubject.value?.id;
+        this.http.put<void>(`${this.apiServerUrl}/game/clash/start`, gameId).subscribe({
+            next: () => {},
+            // error: (e) => console.log(e)
+        });
+    }
+
+    public clashProcessed(): void {
+        const headers = new HttpHeaders().set('Content-Type', 'text/plain');
+        const gameId = this.gameSubject.value?.id;
+        this.http.put<void>(`${this.apiServerUrl}/game/clash/processed`, gameId, { headers, responseType: 'text' as 'json' }).subscribe({
+            next: () => {},
+            // error: (e) => console.log(e)
+        });
+    }
+
+    public rollInitForPlayer(playerId: string): Observable<number> {
+        return this.http.get<number>(`${this.apiServerUrl}/player/rollinit?id=${playerId}`)
+    }
+
+    public removeCardInPlay(playerId: string): void {
+        this.http.delete<void>(`${this.apiServerUrl}/player/cardInPlay?id=${playerId}`).subscribe({
+            next: () => {},
+            error: (e) => console.log("Error removing card in play: ", e)
+        });
+    }
+
+    public playerWonClash(playerId: string): void{
+        const headers = new HttpHeaders().set('Content-Type', 'text/plain');
+        this.http.put<void>(`${this.apiServerUrl}/player/wonClash`, playerId, { headers }).subscribe({
+            next: () => {},
+            error: (e) => console.log("Error checking if player won: ", e)
+        });
     }
 }

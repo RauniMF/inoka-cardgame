@@ -1,0 +1,27 @@
+<div>
+
+    @if (cards.length > 0) {
+    <div
+        class="hand-container"
+        [class.stowed]="handState() === 'stowed'"
+        [class.display]="handState() === 'display'"
+        (click)="toggleHand()"
+    >
+        @if (handState() === 'stowed') {
+            <p class="stowed_text"> Click to view hand </p>
+        }
+
+        @for (card of cards; track card.id; let index = $index) {
+                <app-card
+                    [card]="card"
+                    [isFlipped]="false"
+                    (mouseover)="onHover(index)"
+                    (mouseleave)="onHover(null)"
+                    (click)="onSelectCard(card, index)"
+                    [class.hovered]="hoveredCard() === index && handState() === 'choosing'"
+                ></app-card>
+            }
+    </div>
+    }
+
+</div>

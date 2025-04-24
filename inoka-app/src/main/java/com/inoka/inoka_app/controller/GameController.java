@@ -54,7 +54,7 @@ public class GameController {
     }
     
     @GetMapping("/player/find")
-    public ResponseEntity<PlayerEntry> getPlayerById(@RequestParam String id) {
+    public ResponseEntity<PlayerEntry> getPlayerById(@RequestParam(name = "id") String id) {
         Player player = gameService.findPlayerById(id);
         if (player != null) {
             return ResponseEntity.ok(new PlayerEntry(player));
@@ -75,8 +75,8 @@ public class GameController {
         return new ResponseEntity<>(pEntry, HttpStatus.CREATED);
     }
 
-    @PutMapping("player/update")
-    public ResponseEntity<?> updatePlayer(@RequestParam String name, @RequestBody String id) {
+    @PutMapping("/player/update")
+    public ResponseEntity<?> updatePlayer(@RequestParam(name = "name") String name, @RequestBody String id) {
         boolean updated = gameService.updatePlayer(id, name);
         if (updated) {
             return new ResponseEntity<>(HttpStatus.OK);
@@ -114,7 +114,7 @@ public class GameController {
         }
     }
 
-    @PostMapping("/game/create")
+    @PostMapping(value = "/game/create", consumes = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> createGame(@RequestParam(required = false) String passcode, @RequestBody String id) {
         Player player = gameService.findPlayerById(id);
         Game game = gameService.createGame(passcode, player);
@@ -170,4 +170,51 @@ public class GameController {
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
     
+    @PutMapping(value = "/game/start", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<?> startGame(@RequestBody String id) {
+        gameService.setGameStart(id);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @PutMapping(value = "/game/clash/start", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<?> startClash(@RequestBody String id) {
+        boolean result = gameService.setClashStart(id);
+        if (result) return new ResponseEntity<>(HttpStatus.OK);
+        return ResponseEntity.status(403).body("Unable to set GameState to CLASH_ROLL_INIT.");
+    }
+
+    @PutMapping(value = "/game/clash/processed", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<?> clashProcessed(@RequestBody String id) {
+        boolean result = gameService.setClashFinishedProcessing(id);
+        if (result) return new ResponseEntity<>(HttpStatus.OK);
+        return ResponseEntity.status(403).body("Unable to set GameState to CLASH_PLAYER_TURN.");
+    }
+
+    @GetMapping("/player/rollinit")
+    public ResponseEntity<Integer> rollInitiativeForPlayer(@RequestParam String id) {
+        int result = gameService.rollInitForPlayer(id);
+        if (result == -1) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        return ResponseEntity.ok(result);
+    }
+
+    @DeleteMapping("/player/cardInPlay")
+    public ResponseEntity<?> removeCardInPlay(@RequestParam String id) {
+        boolean result = gameService.removePlayerCardInPlay(id);
+        if (result) return new ResponseEntity<>(HttpStatus.OK);
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
+
+    @PutMapping(value = "/player/gotKnockout", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<?> playerPickUpKnockout(@RequestBody String id) {
+        boolean result = gameService.playerPickUpKnockout(id);
+        if (result) return new ResponseEntity<>(HttpStatus.OK);
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
+
+    @PutMapping(value = "/player/wonClash", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<?> playerWonClash(@RequestBody String id) {
+        boolean result = gameService.playerWonClash(id);
+        if (result) return new ResponseEntity<>(HttpStatus.OK);
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
 }

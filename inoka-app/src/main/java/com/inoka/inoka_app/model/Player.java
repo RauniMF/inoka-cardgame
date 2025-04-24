@@ -87,6 +87,12 @@ public class Player implements Serializable{
             return false; // Deck is full
         }
     }
+    public void removeCardFromDeck(Card card) {
+        if (this.deck.contains(card)) {
+            this.deck.remove(card);
+        }
+    }
+
     private void generateRandomDeck() {
         Random rand = new Random();
         CardStyle[] styles = CardStyle.values();
@@ -107,6 +113,10 @@ public class Player implements Serializable{
     public void setSacredStones(int sacredStones) {
         this.sacredStones = sacredStones;
     }
+    public int giveSacredStone() {
+        this.sacredStones += 1;
+        return this.sacredStones;
+    }
 
     public int rollInitiative() {
         Random rand = new Random();
@@ -115,6 +125,9 @@ public class Player implements Serializable{
     }
     public int getInitiative() {
         return initiative;
+    }
+    public void setInitiative(int initiative) {
+        this.initiative = initiative;
     }
     public void addToInitiative(int modifier) {
         this.initiative += modifier;

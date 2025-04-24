@@ -12,12 +12,18 @@ import { FrontPageComponent } from './components/front-page/front.component';
 import { LobbyComponent } from './components/lobby/lobby.component';
 import { LobbyMainComponent } from './components/lobby/lobby-main.component';
 import { GameWebSocketService } from './services/game-websocket.service';
+import { PlaymatComponent } from './components/playmat/playmat.component';
+import { CardComponent } from './components/playmat/card/card.component';
+import { HandComponent } from './components/playmat/hand/hand.component';
+import { CommonModule } from '@angular/common';
+import { PlayerEntryComponent } from './components/lobby/player-entry/player-entry.component';
 
 @NgModule({
   declarations: [
     AppComponent
   ],
   imports: [
+    CommonModule,
     BrowserModule,
     AppRoutingModule,
     UserComponent,
@@ -25,7 +31,11 @@ import { GameWebSocketService } from './services/game-websocket.service';
     QueueComponent,
     FrontPageComponent,
     LobbyComponent,
-    LobbyMainComponent
+    LobbyMainComponent,
+    PlayerEntryComponent,
+    PlaymatComponent,
+    CardComponent,
+    HandComponent
   ],
   providers: [
     provideHttpClient(withFetch()),

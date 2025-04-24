@@ -9,10 +9,10 @@
 - Use Postman to test API (DONE)
 
 > Update back end
-- STOMP WebSocket communication
-- GameWebSocketController message handling
-- Broadcasts using ScheduledExecutorService in GameService
-- Games map as ConcurrentHashMap + synchronized() implementation for Game object modification
+- STOMP WebSocket communication (DONE)
+- GameWebSocketController message handling (DONE)
+- Broadcasts using ScheduledExecutorService in GameService (Done)
+- Games map as ConcurrentHashMap + synchronized() implementation for Game object modification (Done)
 
 > Implement front end
 - Get page setup for basic implementation
@@ -23,20 +23,33 @@
 - Waiting screen showing players in lobby
      - Open lobby page when pressing Join Game button  (DONE)
      - Display waiting players in lobby (Done)
-           - Update players list and show their ready status
+           - Update players list and show their ready status (DONE)
      - Implement ready button (Done)
-     - Check for players present, remove them if not
-     - Show players who are ready
+     - **Check for players present, remove them if not**
+     - Show players who are ready (DONE)
      - Game starts when at least 2 players are ready (Done)
-           - Route to game page
+           - **Route to game page** (Done)
 
 > Game flow
 - Only player Id, name and game Id will be kept on the database.
 - Game map will keep track of player decks and other attributes.
-- Show hand at start
-- Choose card
-- Countdown then show all players cards
+- Show hand at start (Done)
+- Choose card (Done)
+     - Communicate with the back-end to set Card in play (Done)
+     - **Taunter class feature**
+- Countdown then show all players cards (DONE)
+     - Fix clash start / clash processed raising errors (Done)
 - Go in initiative order, player chooses move
+     - **Cooldown between actions: i.e. show player roll value for some time before moving onto next state** (Done)
+     - Player decision: Choose card to attack, skip turn, or forfeit from clash
+          - Implement forfeit option
+               - Remove player card & display they've chosen to forfeit on the following CLASH_PROCESSING_DECISION
 - Process the move and move onto next player
+     - **Picking up a knockout: Player's card receives totem & regains d12 hp** (Done)
+     - Player whose card was knocked out: Can choose to either put another card in play or forfeit from the clash
+          - Implement forfeit option
+               - Remove player card & remove them from initiative order
+               - **Display player chose to forfeit on front-end**
+     - Winning a clash: Be the last card standing. Winner receives a sacred stone
 - Process by game state
 - Develop each game state
