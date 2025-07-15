@@ -44,6 +44,11 @@ public class GameWebSocketController {
         gameService.setClashStart(gameId);
     }
 
+    @MessageMapping("/clashNew")
+    public void handleNewClash(@Payload String gameId) {
+        gameService.startNewClash(gameId);
+    }
+
     @MessageMapping("/clashProcessed")
     public void handleClashProcessed(@Payload String gameId) {
         gameService.setClashFinishedProcessing(gameId);

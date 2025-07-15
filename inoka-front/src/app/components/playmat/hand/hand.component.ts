@@ -46,7 +46,10 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
       if (this.suppressChoosing || (changes['existingCard'] && changes['existingCard'].currentValue)) {
         this.handState.set('stowed');
       }
-      else if (changes['existingCard'] && !changes['existingCard'].currentValue) {
+      else if (
+        (changes['existingCard'] && !changes['existingCard'].currentValue) ||
+        (changes['suppressChoosing'] && !changes['suppressChoosing'].currentValue && !this.existingCard)
+      ){
         this.handState.set('choosing');
       }
   }

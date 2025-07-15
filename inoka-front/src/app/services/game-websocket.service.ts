@@ -51,6 +51,15 @@ export class GameWebSocketService {
         }
     }
 
+    startNewClash(gameId: string): void {
+        if (this.stompClient && this.stompClient.connected) {
+            this.stompClient.publish({
+                destination: "/app/clashNew",
+                body: gameId
+            })
+        }
+    }
+
     clashProcessed(gameId: string): void {
         if (this.stompClient && this.stompClient.connected) {
             this.stompClient.publish({

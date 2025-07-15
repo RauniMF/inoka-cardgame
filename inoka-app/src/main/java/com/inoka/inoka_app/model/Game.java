@@ -95,6 +95,9 @@ public class Game {
     public Card removeCardInPlay(String playerId) {
         return this.cardsInPlay.remove(playerId);
     }
+    public void removeAllCardsFromPlay() {
+        this.cardsInPlay.clear();
+    }
     // Removes totem from any cards in play
     public void resetCardsTotem() {
         for (String playerUUID : this.cardsInPlay.keySet()) {

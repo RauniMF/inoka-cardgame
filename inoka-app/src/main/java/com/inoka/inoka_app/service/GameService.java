@@ -261,11 +261,28 @@ public class GameService {
         result.add(false);
         games.computeIfPresent(gameId, (id, game) -> {
             synchronized (game) {
-                if (game.getState() == GameState.COUNT_DOWN ||
-                    game.getState() == GameState.CLASH_CONCLUDED) {
+                if (game.getState() == GameState.COUNT_DOWN) {
                         game.setState(GameState.CLASH_ROLL_INIT);
                         // Initiative values are re-rolled at start of clash
                         game.resetInitiativeValue();
+                        result.set(0, true);
+                        queueGameUpdate(gameId);
+                    }
+                return game;
+            }
+        });
+        return result.get(0);
+    }
+
+    public boolean startNewClash(String gameId) {
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                if (game.getState() == GameState.CLASH_CONCLUDED) {
+                        game.setState(GameState.DRAWING_CARDS);
+                        // Remove cards from play
+                        game.removeAllCardsFromPlay();
                         result.set(0, true);
                         queueGameUpdate(gameId);
                     }

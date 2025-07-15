@@ -124,6 +124,9 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     switch(state) {
       case GameState.DRAWING_CARDS:
         //console.log("State reached: Drawing cards.")
+        this.cardsNotRevealed = true;
+        this.handSuppressed = false;
+        if (this.selectedCard) this.selectedCard = null;
         this.displayStateVisuals(state);
         break;
       case GameState.COUNT_DOWN:
@@ -201,6 +204,10 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         this.handSuppressed = true;
         if (this.selectedCard?.curHp! <= 0) this.selectedCard = null;
         this.gameStatus.set(`${this.winnerName()} won the clash!`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Start next clash
+        this.gameStatus.set("Starting new clash...");
+        this.gameWebSocketService.startNewClash(this.game?.id!);
         break;
     }
   }
