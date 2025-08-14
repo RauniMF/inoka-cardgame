@@ -39,8 +39,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 @RestController
 @RequestMapping("/inoka")
 public class GameController {
-    @Autowired
-    private GameService gameService;
+    private final GameService gameService;
 
     public GameController(GameService gameService) {
         this.gameService = gameService;

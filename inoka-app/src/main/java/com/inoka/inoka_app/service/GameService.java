@@ -12,6 +12,7 @@ import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 import com.inoka.inoka_app.repositories.PlayerRepository;
 
+import java.lang.foreign.Linker.Option;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Map;
@@ -120,31 +121,57 @@ public class GameService {
      * Creates or joins existing game
      */
     public synchronized Game createGame(String passcode, Player player) {
-        if (passcode == null || passcode.isEmpty()) {
-            // Check if there's an existing game without a passcode and in WAITING_FOR_PLAYERS state
-            for (Game game : games.values()) {
-                if ((game.getPasscode() == null || game.getPasscode().isEmpty()) && game.getState() == GameState.WAITING_FOR_PLAYERS) {
-                    // Add the player to the existing game
-                    this.addPlayerToGame(game.getId(), player);
-                    return game;
-                }
-            }
-        }
-        // Check if there's a game with the same passcode and in WAITING_FOR_PLAYERS state
-        for (Game game : games.values()) {
-            if (game.getPasscode() != null && game.getPasscode().equals(passcode)) {
-                if (game.getState() == GameState.WAITING_FOR_PLAYERS) {
-                    this.addPlayerToGame(game.getId(), player);
-                    return game;
-                }
-            }
-        }
+        // Check if player can join existing game
+        // Can also use .orElseGet() for more succinct code but I think this is a little more readable
+        Optional<Game> gameCheck = this.joinGame(passcode, player);
+        if (gameCheck.isPresent()) return gameCheck.get();
 
         // If no suitable game was found, create a new game with the given passcode
         Game game = (passcode != null && !passcode.isEmpty()) ? new Game(passcode) : new Game();
         games.put(game.getId(), game);
         this.addPlayerToGame(game.getId(), player);
         return game;
+    }
+    /*
+     * Joins game if game exists & game.numPlayers() < 6
+     */
+    public synchronized Optional<Game> joinGame(String passcode, Player player) {
+        // Checks if player can join existing game
+        for (Game game : games.values()) {
+            if (passcode == null || passcode.isEmpty()) {
+                // No passcode
+                if ((game.getPasscode() == null || game.getPasscode().isEmpty()) &&
+                    (game.getState() == GameState.WAITING_FOR_PLAYERS) &&
+                    (game.numPlayers() < 6)) {
+                    // Add the player to the existing game
+                    this.addPlayerToGame(game.getId(), player);
+                    return Optional.of(game);
+                }
+            }
+            else {
+                // passcode
+                if ((game.getPasscode() != null && game.getPasscode().equals(passcode)) &&
+                    (game.getState() == GameState.WAITING_FOR_PLAYERS) &&
+                    (game.numPlayers() < 6)) {
+                    this.addPlayerToGame(game.getId(), player);
+                    return Optional.of(game);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+    /*
+     * Handles adding player to game object
+     */
+    public void addPlayerToGame(String gameId, Player player) {
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                game.addPlayer(player);
+                gameRepo.save(player);
+                queueGameUpdate(gameId);
+                return game;
+            }
+        });
     }
 
     public Game getGame(String id) {
@@ -160,22 +187,7 @@ public class GameService {
         return games;
     }
 
-    /*
-     * Given a passcode,
-     * Add player to open lobby with passcode
-     * Returns true if player was successfully added
-     * Else, false
-     */
-    public void addPlayerToGame(String gameId, Player player) {
-        games.computeIfPresent(gameId, (id, game) -> {
-            synchronized (game) {
-                game.addPlayer(player);
-                gameRepo.save(player);
-                queueGameUpdate(gameId);
-                return game;
-            }
-        });
-    }
+
 
     /*
      * Given the UUID of a game,

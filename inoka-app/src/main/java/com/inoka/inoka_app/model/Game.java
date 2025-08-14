@@ -68,6 +68,9 @@ public class Game {
     public Player getPlayer(String playerId) {
         return players.get(playerId);
     }
+    public int numPlayers() {
+        return players.size();
+    }
 
     public void updatePasscode(String passcode) {
         this.passcode = passcode;
