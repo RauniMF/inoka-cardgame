@@ -19,6 +19,7 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
   @Input() existingCard: Card | null = null;
   @Input() suppressChoosing: boolean = false;
   @Output() selectedCardEmitter = new EventEmitter<Card>();
+  @Output() handStateEmitter = new EventEmitter<HandState>();
 
   cards: Card[] = [];
   hoveredCard = signal<number | null>(null);
@@ -44,14 +45,19 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
       if (this.suppressChoosing || (changes['existingCard'] && changes['existingCard'].currentValue)) {
-        this.handState.set('stowed');
+        this.updateState('stowed');
       }
       else if (
         (changes['existingCard'] && !changes['existingCard'].currentValue) ||
         (changes['suppressChoosing'] && !changes['suppressChoosing'].currentValue && !this.existingCard)
       ){
-        this.handState.set('choosing');
+        this.updateState('choosing');
       }
+  }
+
+  updateState(state: HandState): void {
+    this.handState.set(state);
+    this.handStateEmitter.emit(state);
   }
 
   fetchCards(): void {
@@ -97,22 +103,22 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
 
   toggleHand(): void {
     if (this.handState() === 'stowed') {
-      this.handState.set('display');
+      this.updateState('display');
     }
     else if (this.handState() === 'display') {
-      this.handState.set('stowed');
+      this.updateState('stowed');
     }
   }
 
   setChoosing(): void {
     if (this.handState() != 'choosing') {
-      this.handState.set('choosing');
+      this.updateState('choosing');
     }
   }
 
   minimizeHandClick(event: Event): void {
     if (this.handState() === 'display' && !(event.target as HTMLElement).closest('.hand-container')) {
-      this.handState.set('stowed');
+      this.updateState('stowed');
     }
   }
 }

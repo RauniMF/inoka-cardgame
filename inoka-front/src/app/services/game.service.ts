@@ -57,7 +57,7 @@ export class GameService {
         }
     }
     private createNewPlayer(): void {
-        const newPlayer: Player = { name: "", id: "", ready: false };
+        const newPlayer: Player = { name: "", id: "", ready: false, sacredStones: 0 };
         this.addPlayer(newPlayer).subscribe({
             next: (p) => {
                 localStorage.setItem('userUUID', p.id);

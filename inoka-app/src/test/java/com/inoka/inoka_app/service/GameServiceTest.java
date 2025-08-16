@@ -71,6 +71,9 @@ public class GameServiceTest {
         // Players aren't ready yet
         Assertions.assertTrue(gameService.allPlayersReady(testGame.getId()).isPresent());
         Assertions.assertFalse(gameService.allPlayersReady(testGame.getId()).get());
+        
+        // If front-end receives allPlayersReady == true, it calls startGame()
+
 
         gameService.setPlayerReady(pOne.getId());
         gameService.setPlayerReady(pTwo.getId());
@@ -84,6 +87,8 @@ public class GameServiceTest {
         gameService.setPlayerReady(pSix.getId());
         Assertions.assertTrue(gameService.allPlayersReady(testGame.getId()).get());
 
-        // If front-end receives allPlayersReady == true, it calls 
+        // Now startGame() should work
+        
+        
     }
 }

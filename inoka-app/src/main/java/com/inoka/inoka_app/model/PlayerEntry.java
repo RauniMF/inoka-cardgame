@@ -5,12 +5,14 @@ public class PlayerEntry {
     private String name;
     private String gameId;
     private boolean isReady;
+    private int sacredStones;
 
     public PlayerEntry(Player player) {
         this.id = player.getId();
         this.name = player.getName();
         this.gameId = player.getGameId();
         this.isReady = player.isReady();
+        this.sacredStones = player.getSacredStones();
     }
 
     public String getId() {
@@ -27,5 +29,9 @@ public class PlayerEntry {
 
     public boolean isReady() {
         return isReady;
+    }
+
+    public int numSacredStones() {
+        return sacredStones;
     }
 }

@@ -9,9 +9,10 @@
     align-items: center;
 }
 
-.playmat-container p {
-    font-size: 1.3vw;
+.playmat-container h2 {
+    font-size: 1.5vw;
     font-style: italic;
+    font-weight: normal;
     margin: 0;
 }
 
@@ -20,6 +21,7 @@
     height: 100%;
     display: grid;
     position: relative;
+    z-index: 1;
 }
 
 .player-position {
@@ -32,9 +34,20 @@
 
 .player-name {
     margin-bottom: 1vw;
-    font-size: 1.2vw;
     color: white;
     text-shadow: 1px 1px 2px black;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.player-name h3, p {
+  font-size: 1.2vw;
+  margin: 0.1vw;
+}
+
+.player-name h3 {
+  font-size: 1.4vw;
 }
 
 .current-player-name {
@@ -171,7 +184,7 @@
   background-color: rgba(235, 235, 235, 1);;
   width: 4vw;
   aspect-ratio: 5/2;
-  z-index: 10;
+  z-index: 3;
 }
 
 .attack-btn {
@@ -207,9 +220,19 @@
   align-items: center;
   margin: 0%;
   left: 0%;
+  bottom: 2vh;
+  z-index: 2;
+}
+
+.hand-container.stowed {
+  width:fit-content;
+}
+
+.hand-container.choosing,
+.hand-container.display {
   width: 100%;
   height: 40%;
-  bottom: 2vh;
+  z-index: 4;
 }
 
 .hand-container app-hand {
@@ -218,6 +241,7 @@
   left: 0%;
   width: 100%;
   bottom: -20%;
+  z-index: 4;
 }
 
 .forfeit-btn {

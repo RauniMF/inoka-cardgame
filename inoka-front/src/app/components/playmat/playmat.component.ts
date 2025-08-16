@@ -27,6 +27,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   cardsInPlay: Map<string, Card> = new Map();
   gameStatus = signal("");
   private prevGameState: GameState | null = null;
+  handState: string | null = null;
   // Cards put in play are flipped over (i.e not revealed)
   cardsNotRevealed = true;
   userTurn = false;
@@ -55,7 +56,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     this.playerSubscription = this.gameService.player$.subscribe({
       next: (player) => {
         this.player = player;
-
+        
         if (this.player?.gameId && this.player.gameId !== 'Not in game') {
           const playerId = this.player.id;
     
@@ -313,6 +314,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     if (!this.userTurn) return;
     if (playerId) {
       // Clicked player to attack
+      console.log(this.selectedCard);
       this.dropdownData = [event.clientX, event.clientY, true];
       this.selectedPlayerId = playerId;
     }
