@@ -13,6 +13,11 @@
                     Skip Turn
                 </button>
             }
+            @if (thisPlayer(); as player){
+                <div class="player-name">
+                    <p id="userPoints" title="Your sacred stones"> {{ player.sacredStones }} </p>
+                </div>
+            }
         }
         </div>
     

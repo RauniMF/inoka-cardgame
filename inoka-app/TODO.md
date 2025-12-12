@@ -13,6 +13,12 @@
 - GameWebSocketController message handling (DONE)
 - Broadcasts using ScheduledExecutorService in GameService (Done)
 - Games map as ConcurrentHashMap + synchronized() implementation for Game object modification (Done)
+- Look at refactoring GameService
+     - Currently handles all business logic operations between the controller and repository layers, which includes basic crud operations with the database & higher level game logic
+     - Might be beneficial to separate the crud operations into a PlayerService (Done)
+- Expand on unit and integration tests
+     - Update existing tests to spoof the service layer with mockito (Done)
+     - Implement restful api mvc test cases with MockMVC or a similar framework
 
 > Implement front end
 - Get page setup for basic implementation

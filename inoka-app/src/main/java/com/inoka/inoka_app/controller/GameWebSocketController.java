@@ -34,7 +34,7 @@ public class GameWebSocketController {
         }
     }
 
-    @MessageMapping("/playerReady") // Client sends message here
+    @MessageMapping("/playerReady")
     public void handlePlayerReady(@Payload String playerId) {
         gameService.setPlayerReady(playerId);
     }

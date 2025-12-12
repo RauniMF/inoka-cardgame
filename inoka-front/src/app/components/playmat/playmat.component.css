@@ -54,6 +54,10 @@
     font-weight: bold;
 }
 
+#userPoints {
+  margin-top: 1vw;
+}
+
 .players-2 {
     grid-template-rows: 1fr 1fr;
     grid-template-columns: 1fr;
@@ -211,6 +215,7 @@
   white-space: nowrap;
   text-align: center;
   margin: 1%;
+  margin-bottom: 0;
 }
 
 .hand-container {

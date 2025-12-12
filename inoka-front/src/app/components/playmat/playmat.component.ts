@@ -102,6 +102,10 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     });
   }
 
+  thisPlayer(): Player | null {
+    return this.players.find(p => p.id == this.player?.id) ?? null;
+  }
+
   otherPlayers(): Player[] {
     if (!this.player) return this.players;
     return this.players.filter(p => p.id !== this.player?.id);
@@ -314,7 +318,6 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     if (!this.userTurn) return;
     if (playerId) {
       // Clicked player to attack
-      console.log(this.selectedCard);
       this.dropdownData = [event.clientX, event.clientY, true];
       this.selectedPlayerId = playerId;
     }

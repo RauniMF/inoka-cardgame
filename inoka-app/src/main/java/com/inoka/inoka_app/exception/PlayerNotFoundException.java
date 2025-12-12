@@ -1,4 +1,4 @@
-package com.inoka.inoka_app.service;
+package com.inoka.inoka_app.exception;
 
 
 public class PlayerNotFoundException extends RuntimeException {

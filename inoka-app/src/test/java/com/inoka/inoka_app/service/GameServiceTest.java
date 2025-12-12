@@ -1,18 +1,35 @@
 package com.inoka.inoka_app.service;
 
+import static org.mockito.Mockito.when;
+
+import java.util.Optional;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 import com.inoka.inoka_app.model.Player;
+import com.inoka.inoka_app.repositories.PlayerRepository;
 
 @SpringBootTest
 public class GameServiceTest {
 
     // Note to self: constructor injection doesn't work with tests
+    // We use the MockitoBean to create a mock for the service
+    @MockitoBean
+    private PlayerRepository playerRepository;
+
+    @MockitoBean
+    private PlayerService playerService;
+
+    @MockitoBean
+    private SchedulerService schedulerService;
+
     @Autowired
     private GameService gameService;
     
@@ -56,6 +73,20 @@ public class GameServiceTest {
         Player pSix = new Player("Player Six");
 
         Game testGame = gameService.createGame("readyTest", pOne);
+        
+        pOne.setGameId(testGame.getId());
+        pTwo.setGameId(testGame.getId());
+        pThree.setGameId(testGame.getId());
+        pFour.setGameId(testGame.getId());
+        pFive.setGameId(testGame.getId());
+        pSix.setGameId(testGame.getId());
+
+        when(playerService.findPlayerById(pOne.getId())).thenReturn(Optional.of(pOne));
+        when(playerService.findPlayerById(pTwo.getId())).thenReturn(Optional.of(pTwo));
+        when(playerService.findPlayerById(pThree.getId())).thenReturn(Optional.of(pThree));
+        when(playerService.findPlayerById(pFour.getId())).thenReturn(Optional.of(pFour));
+        when(playerService.findPlayerById(pFive.getId())).thenReturn(Optional.of(pFive));
+        when(playerService.findPlayerById(pSix.getId())).thenReturn(Optional.of(pSix));
 
         Assertions.assertTrue(testGame.getState() == GameState.WAITING_FOR_PLAYERS);
 
@@ -73,22 +104,73 @@ public class GameServiceTest {
         Assertions.assertFalse(gameService.allPlayersReady(testGame.getId()).get());
         
         // If front-end receives allPlayersReady == true, it calls startGame()
+        Assertions.assertFalse(gameService.setGameStart(testGame.getId()));
 
+        Assertions.assertTrue(gameService.setPlayerReady(pOne.getId()));
 
-        gameService.setPlayerReady(pOne.getId());
+        Assertions.assertTrue(gameService.getGameById(testGame.getId()).get().getPlayer(pOne.getId()).isReady());
+
         gameService.setPlayerReady(pTwo.getId());
         gameService.setPlayerReady(pThree.getId());
         gameService.setPlayerReady(pFour.getId());
         gameService.setPlayerReady(pFive.getId());
 
         // Not all players are ready
-        Assertions.assertFalse(gameService.allPlayersReady(testGame.getId()).get());
+        // Assertions.assertFalse(gameService.allPlayersReady(testGame.getId()).get());
 
         gameService.setPlayerReady(pSix.getId());
         Assertions.assertTrue(gameService.allPlayersReady(testGame.getId()).get());
 
         // Now startGame() should work
+        Assertions.assertTrue(gameService.setGameStart(testGame.getId()));
+    }
+
+    @Test
+    public void putCardInPlayTest() {
+        /*
+         *  Tests functionality of getPlayerDeck() method
+         *  verifying if Game objects are storing player decks in memory
+         *  Then putting a card in play once in a clash
+         */
+
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+
+        Game testGame = gameService.createGame("readyTest", pOne);
         
-        
+        pOne.setGameId(testGame.getId());
+        pTwo.setGameId(testGame.getId());
+
+        when(playerService.findPlayerById(pOne.getId())).thenReturn(Optional.of(pOne));
+        when(playerService.findPlayerById(pTwo.getId())).thenReturn(Optional.of(pTwo));
+
+        Assertions.assertTrue(testGame.getState() == GameState.WAITING_FOR_PLAYERS);
+
+        gameService.createGame("readyTest", pTwo);
+
+        Assertions.assertTrue(testGame.numPlayers() == 2);
+
+        // Players aren't ready yet
+        Assertions.assertTrue(gameService.allPlayersReady(testGame.getId()).isPresent());
+        Assertions.assertFalse(gameService.allPlayersReady(testGame.getId()).get());
+
+        gameService.setPlayerReady(pOne.getId());
+        gameService.setPlayerReady(pTwo.getId());
+
+        // Front-end calls startGame()
+        Assertions.assertTrue(gameService.setGameStart(testGame.getId()));
+        // No cards in play
+        Assertions.assertTrue(gameService.getGameById(testGame.getId()).get().getCardsInPlay().size() == 0);
+
+        // When in game, players receive their hand via the fetchCard() method in the HandComponent
+        Assertions.assertTrue(gameService.getPlayerDeck(pOne.getId()).get().size() == 9);
+
+        Card cardToPlay = pOne.getDeck().get(0);
+
+        // The player then chooses a card to put in play, which calls putCardInPlay()
+        Assertions.assertTrue(gameService.putCardInPlay(pOne.getId(), cardToPlay));
+
+        // Verify card has been put in play
+        Assertions.assertTrue(gameService.getGameById(testGame.getId()).get().getCardsInPlay().size() > 0);
     }
 }

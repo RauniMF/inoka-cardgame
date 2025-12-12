@@ -17,7 +17,7 @@ import jakarta.persistence.Transient;
 
 @Entity
 @Table(name="players")
-public class Player implements Serializable{
+public class Player implements Serializable {
     @Id
     @Column(name = "play_id", nullable = true, updatable = false, length = 128)
     private String id;
