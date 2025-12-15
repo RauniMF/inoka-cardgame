@@ -1,7 +1,9 @@
 package com.inoka.inoka_app.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import com.inoka.inoka_app.event.GameUpdateEvent;
 import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.model.Action;
 import com.inoka.inoka_app.model.Card;
@@ -19,13 +21,24 @@ public class GameService {
     // Repo containing player data (name, id, gameid)
     private final PlayerService playerService;
 
-    private final SchedulerService schedulerService;
+    private final ApplicationEventPublisher eventPublisher;
     // Transient game data stored in HashMap
     private final ConcurrentHashMap<String, Game> games = new ConcurrentHashMap<>();;
 
-    public GameService(PlayerService playerService, SchedulerService schedulerService) {
+    public GameService(PlayerService playerService, ApplicationEventPublisher eventPublisher) {
         this.playerService = playerService;
-        this.schedulerService = schedulerService;
+        this.eventPublisher = eventPublisher;
+    }
+    
+    /**
+     * Publishes a game update event to notify listeners (e.g., SchedulerService) 
+     * that a game state has changed and needs to be broadcasted.
+     */
+    private void publishGameUpdate(String gameId) {
+        Game game = games.get(gameId);
+        if (game != null) {
+            eventPublisher.publishEvent(new GameUpdateEvent(this, game));
+        }
     }
     
     public void addGame(Game game) {
@@ -121,7 +134,7 @@ public class GameService {
             synchronized (game) {
                 game.addPlayer(player);
                 this.playerService.savePlayer(player);
-                this.schedulerService.queueGameUpdate(gameId);
+                this.publishGameUpdate(gameId);
                 return game;
             }
         });
@@ -162,7 +175,7 @@ public class GameService {
                 synchronized (game) {
                     Player playerTransient = game.getPlayer(player.getId());
                     playerTransient.setReady(true);
-                    this.schedulerService.queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                     return game;
                 }
             });
@@ -204,7 +217,7 @@ public class GameService {
                 if (game.getState() == GameState.WAITING_FOR_PLAYERS && this.allPlayersReady(gameId).get()) {
                     game.setState(GameState.DRAWING_CARDS);
                     result.set(0, true);
-                    this.schedulerService.queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                 }
                 return game;
             }
@@ -222,7 +235,7 @@ public class GameService {
                         // Initiative values are re-rolled at start of clash
                         game.resetInitiativeValue();
                         result.set(0, true);
-                        this.schedulerService.queueGameUpdate(gameId);
+                        this.publishGameUpdate(gameId);
                     }
                 return game;
             }
@@ -240,7 +253,7 @@ public class GameService {
                         // Remove cards from play
                         game.removeAllCardsFromPlay();
                         result.set(0, true);
-                        this.schedulerService.queueGameUpdate(gameId);
+                        this.publishGameUpdate(gameId);
                     }
                 return game;
             }
@@ -258,7 +271,7 @@ public class GameService {
                     // Move onto next player's turn
                     game.determineNextInitiativeValue();
                     result.set(0, true);
-                    this.schedulerService.queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                 }
                 return game;
             }
@@ -303,7 +316,7 @@ public class GameService {
                         game.setState(GameState.CLASH_PLAYER_TURN);
                         game.determineNextInitiativeValue();
                     }
-                    this.schedulerService.queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                     return game;
                 }
             });
@@ -343,7 +356,7 @@ public class GameService {
                             game.determineNextInitiativeValue();
                         }
                     }
-                    this.schedulerService.queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                     return game;
                 }
             });
@@ -376,7 +389,7 @@ public class GameService {
                     }
                     game.setLastAction(dealingPlayerId, receivingPlayerId, result.get(0));
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
-                    this.schedulerService.queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                     return game;
                 }
             });
@@ -399,7 +412,7 @@ public class GameService {
                     if (removedCard != null) {
                         result.set(0, true);
                         if (game.getState() == GameState.CLASH_PROCESSING_DECISION) game.setState(GameState.CLASH_PLAYER_REPLACING_CARD);
-                        this.schedulerService.queueGameUpdate(gameId);
+                        this.publishGameUpdate(gameId);
                     }
                     return game;
                 }
@@ -439,13 +452,13 @@ public class GameService {
                             else {
                                 game.setState(GameState.CLASH_CONCLUDED);
                             }
-                            this.schedulerService.queueGameUpdate(gameId);
+                            this.publishGameUpdate(gameId);
                             return game;
                         }
                         // Otherwise, give player's card totem & heal
                         game.resetCardsTotem(); // Only one player can have totem
                         game.playerGiveTotem(playerId);
-                        this.schedulerService.queueGameUpdate(gameId);
+                        this.publishGameUpdate(gameId);
                     }
                     return game;
                 }
@@ -477,7 +490,7 @@ public class GameService {
                     // Update game state & last action
                     game.setLastAction("null", playerId, -1);
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
-                    this.schedulerService.queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                     return game;
                 }
             });
@@ -510,7 +523,7 @@ public class GameService {
                             game.setState(GameState.CLASH_CONCLUDED);
                         }
                         result.set(0, true);
-                        this.schedulerService.queueGameUpdate(gameId);
+                        this.publishGameUpdate(gameId);
                     }
                     return game;
                 }
