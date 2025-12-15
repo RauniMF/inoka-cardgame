@@ -39,6 +39,8 @@ public class GameService {
         if (game != null) {
             eventPublisher.publishEvent(new GameUpdateEvent(this, game));
         }
+        // Note: If game is null, it means the game was already removed or doesn't exist.
+        // This can happen in race conditions and is an expected scenario, so we don't log it.
     }
     
     public void addGame(Game game) {
