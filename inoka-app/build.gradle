@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '3.5.4'
+	id 'org.springframework.boot' version '3.5.8'
 	id 'io.spring.dependency-management' version '1.1.5'
 }
 
@@ -17,6 +17,11 @@ repositories {
 	mavenCentral()
 }
 
+configurations {
+	mockitoAgent
+	byteBuddyAgent
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -25,11 +30,18 @@ dependencies {
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.junit.jupiter:junit-jupiter-api'
+	testImplementation 'org.mockito:mockito-core:5.14.0'
+	testImplementation 'net.bytebuddy:byte-buddy:1.15.1'
+	mockitoAgent ('org.mockito:mockito-core:5.14.0') { transitive = false }
+	byteBuddyAgent ('net.bytebuddy:byte-buddy:1.15.1') {}
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testRuntimeOnly 'net.bytebuddy:byte-buddy-agent:1.15.1'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+	jvmArgs += "-javaagent:${configurations.mockitoAgent.asPath}"
+	jvmArgs += "-javaagent:${configurations.byteBuddyAgent.asPath}"
 }
 
 tasks.withType(JavaCompile) {

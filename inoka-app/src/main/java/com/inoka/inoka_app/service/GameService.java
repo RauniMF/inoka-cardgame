@@ -30,17 +30,12 @@ public class GameService {
         this.eventPublisher = eventPublisher;
     }
     
-    /**
-     * Publishes a game update event to notify listeners (e.g., SchedulerService) 
-     * that a game state has changed and needs to be broadcasted.
-     */
+    
     private void publishGameUpdate(String gameId) {
         Game game = games.get(gameId);
         if (game != null) {
             eventPublisher.publishEvent(new GameUpdateEvent(this, game));
         }
-        // Note: If game is null, it means the game was already removed or doesn't exist.
-        // This can happen in race conditions and is an expected scenario, so we don't log it.
     }
     
     public void addGame(Game game) {

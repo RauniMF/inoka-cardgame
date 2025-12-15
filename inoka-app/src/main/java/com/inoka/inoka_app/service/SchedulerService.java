@@ -40,11 +40,6 @@ public class SchedulerService {
         pendingGameUpdates.put(game.getId(), game);
     }
 
-    /**
-     * Event listener that handles game update events.
-     * This completely decouples SchedulerService from GameService,
-     * eliminating the circular dependency.
-     */
     @EventListener
     public void handleGameUpdateEvent(GameUpdateEvent event) {
         queueGameUpdate(event.getGame());
