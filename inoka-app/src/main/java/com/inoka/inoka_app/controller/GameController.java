@@ -54,6 +54,7 @@ public class GameController {
     @PostMapping("/player/add")
     public ResponseEntity<PlayerEntry> addPlayer(@RequestBody Player player) {
         PlayerEntry pEntry;
+        // TODO: Revisit how player creation is handled now that we're using JWT authentication
         if (player.getId() == "") {
             Player newPlayer = new Player(player.getName());
             pEntry = new PlayerEntry(playerService.addPlayer(newPlayer));

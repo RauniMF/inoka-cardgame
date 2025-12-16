@@ -50,6 +50,8 @@ Ensure you have the following installed on your system:
     spring.jpa.hibernate.ddl-auto=update
     spring.jackson.default-property-inclusion=always
     ```
+    > Note: For JWT authentication, jwt.secret and jwt.expiration must also be configured.
+
 3. Build the back-end:
     ```bash
     gradle build
