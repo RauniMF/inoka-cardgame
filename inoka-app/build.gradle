@@ -37,7 +37,7 @@ dependencies {
 	testImplementation 'org.mockito:mockito-core:5.14.0'
 	testImplementation 'net.bytebuddy:byte-buddy:1.15.1'
 	mockitoAgent ('org.mockito:mockito-core:5.14.0') { transitive = false }
-	byteBuddyAgent ('net.bytebuddy:byte-buddy:1.15.1') {}
+	byteBuddyAgent ('net.bytebuddy:byte-buddy-agent:1.15.1') {}
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testRuntimeOnly 'net.bytebuddy:byte-buddy-agent:1.15.1'
 }

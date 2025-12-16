@@ -6,12 +6,15 @@ import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.model.PlayerEntry;
+import com.inoka.inoka_app.security.JwtUtil;
+import com.inoka.inoka_app.security.PlayerPrincipal;
 import com.inoka.inoka_app.service.GameService;
 import com.inoka.inoka_app.service.PlayerService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,7 +22,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -32,10 +37,16 @@ public class GameController {
 
     private final PlayerService playerService;
     private final GameService gameService;
+    private final JwtUtil jwtUtil;
 
-    public GameController(PlayerService playerService, GameService gameService) {
+    public GameController(
+        PlayerService playerService,
+        GameService gameService,
+        JwtUtil jwtUtil
+    ) {
         this.playerService = playerService;
         this.gameService = gameService;
+        this.jwtUtil = jwtUtil;
     }
 
     @GetMapping("/player/all")
@@ -46,23 +57,33 @@ public class GameController {
     }
     
     @GetMapping("/player/find")
-    public ResponseEntity<PlayerEntry> getPlayerById(@RequestParam(name = "id") String id) {
-        Optional<Player> player = playerService.findPlayerById(id);
-        return player.isPresent() ? ResponseEntity.ok(new PlayerEntry(player.get())) : new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    public ResponseEntity<PlayerEntry> getPlayerById(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+        Player player = principal.getPlayer();
+        return ResponseEntity.ok(new PlayerEntry(player));
     }
 
     @PostMapping("/player/add")
-    public ResponseEntity<PlayerEntry> addPlayer(@RequestBody Player player) {
+    public ResponseEntity<Map<String, Object>> addPlayer(@RequestBody Player player) {
         PlayerEntry pEntry;
-        // TODO: Revisit how player creation is handled now that we're using JWT authentication
-        if (player.getId() == "") {
+        if (player.getId() == null || player.getId().isEmpty()) {
             Player newPlayer = new Player(player.getName());
             pEntry = new PlayerEntry(playerService.addPlayer(newPlayer));
         }
         else {
             pEntry = new PlayerEntry(playerService.addPlayer(player));
         }
-        return new ResponseEntity<>(pEntry, HttpStatus.CREATED);
+
+        // Generate JWT token using the player's UUID
+        String token = jwtUtil.generateToken(pEntry.getId());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("player", pEntry);
+        response.put("token", token);
+
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @PutMapping("/player/update")

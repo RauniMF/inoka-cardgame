@@ -17,7 +17,11 @@ public class WebSecurityConfig {
     private final CustomUserDetailsService userDetailsService;
     private final AuthEntryPointJwt unauthorizedHandler;
 
-    public WebSecurityConfig(JwtUtil jwtUtil, CustomUserDetailsService userDetailsService, AuthEntryPointJwt unauthorizedHandler) {
+    public WebSecurityConfig(
+        JwtUtil jwtUtil,
+        CustomUserDetailsService userDetailsService,
+        AuthEntryPointJwt unauthorizedHandler
+    ) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
         this.unauthorizedHandler = unauthorizedHandler;

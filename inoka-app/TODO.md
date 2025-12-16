@@ -24,7 +24,7 @@
      - Store user token in secure cookie
      - Update front-end to send Authorization header in each API call
      - User calls addPlayer and saves UUID to localStorage when first opening webapp
-          - Update addPlayer method and other API calls to require authentication
+          - **Update addPlayer method and other API calls to require authentication**
 
 > Implement front end
 - Get page setup for basic implementation
