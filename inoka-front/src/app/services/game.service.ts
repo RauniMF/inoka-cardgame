@@ -27,7 +27,8 @@ export class GameService {
 
         this.gameWebSocketService.gameUpdates$.subscribe((updatedGame: Game | null) => {
             if (updatedGame) {
-                // console.log("Game update received via WebSocket: ", updatedGame);
+                // INFO: 
+                console.log("Game update received via WebSocket: ", updatedGame);
                 this.gameSubject.next(updatedGame);
             }
         });
@@ -38,31 +39,67 @@ export class GameService {
     */
     private loadPlayer(): void {
         const storedUUID = localStorage.getItem('userUUID');
-        if (storedUUID) {
-            // Find player with ID in back-end
+        const storedToken = localStorage.getItem('authToken');
+        
+        if (storedUUID && storedToken) {
+            // Find player with ID in back-end (token will be sent via interceptor)
             this.findPlayer(storedUUID).subscribe({
                 next: (p) => {
                     this.playerSubject.next(p);
-                    // console.log("Player loaded: ", p);
+                    console.log("Player loaded from existing session");
                     if(this.playerSubject.value != undefined &&
                         this.playerSubject.value.gameId != null &&
                         this.playerSubject.value.gameId != "Not in game")
                         this.loadGame(this.playerSubject.value.gameId);
                 },
-                // Create if not found
-                error: (e) => this.createNewPlayer()
+                // If findPlayer fails, handle gracefully
+                error: (e) => {
+                    console.log("Error loading player, attempting token refresh:", e);
+                    // The interceptor may have already handled refresh, but if it fails,
+                    // we need to clear data and create a new player
+                    this.clearAuthData();
+                    this.createNewPlayer();
+                }
+            });
+        } else if (storedUUID && !storedToken) {
+            // Have UUID but no token - refresh the token
+            // INFO: 
+            // console.log("UUID found but no token, refreshing...");
+            this.refreshToken(storedUUID).subscribe({
+                next: (response) => {
+                    localStorage.setItem('authToken', response.token);
+                    this.playerSubject.next(response.player);
+                    // console.log("Token refreshed for existing player");
+                    if(response.player.gameId != null && response.player.gameId != "Not in game") {
+                        this.loadGame(response.player.gameId);
+                    }
+                },
+                error: (e) => {
+                    // Player UUID doesn't exist in database, or refresh failed
+                    // console.log("Failed to refresh token, player may not exist. Creating new player.", e);
+                    this.clearAuthData();
+                    this.createNewPlayer();
+                }
             });
         } else {
+            // No UUID or token - create new player
             this.createNewPlayer();
         }
     }
+    
+    private clearAuthData(): void {
+        localStorage.removeItem('userUUID');
+        localStorage.removeItem('authToken');
+    }
+    
     private createNewPlayer(): void {
         const newPlayer: Player = { name: "", id: "", ready: false, sacredStones: 0 };
         this.addPlayer(newPlayer).subscribe({
-            next: (p) => {
-                localStorage.setItem('userUUID', p.id);
-                //console.log("Player created: ", p);
-                this.playerSubject.next(p);
+            next: (response) => {
+                localStorage.setItem('userUUID', response.player.id);
+                localStorage.setItem('authToken', response.token);
+                console.log("Player created with token");
+                this.playerSubject.next(response.player);
             },
             error: (e) => {
                 console.log("Error creating player object: ", e);
@@ -72,7 +109,7 @@ export class GameService {
 
     // Fetch game details to update gameSubject
     private loadGame(gameId: string): void {
-        this.http.get<Game>(`${this.apiServerUrl}/game/find?id=${gameId}`).subscribe({
+        this.http.get<Game>(`${this.apiServerUrl}/game/find`).subscribe({
             next: (game) => {
                 this.gameSubject.next(game);
                 this.gameWebSocketService.connect(game.id);
@@ -92,8 +129,12 @@ export class GameService {
         return this.http.get<Player>(`${this.apiServerUrl}/player/find?id=${id}`);
     }
 
-    public addPlayer(player: Player): Observable<Player> {
-        return this.http.post<Player>(`${this.apiServerUrl}/player/add`, player);
+    public addPlayer(player: Player): Observable<{ player: Player, token: string }> {
+        return this.http.post<{ player: Player, token: string }>(`${this.apiServerUrl}/player/add`, player);
+    }
+
+    public refreshToken(playerId: string): Observable<{ player: Player, token: string }> {
+        return this.http.post<{ player: Player, token: string }>(`${this.apiServerUrl}/player/refresh-token`, { playerId });
     }
 
     // Updates player's name on backend and the BehaviorSubject
@@ -115,13 +156,12 @@ export class GameService {
     public createGame(playerId: string, passcode: string = ""): void {
         const currentPlayer = this.playerSubject.value;
         if (currentPlayer && currentPlayer.id) {
-            const headers = new HttpHeaders().set('Content-Type', 'text/plain');
             let httpObservable: Observable<string>;
             if (passcode === "") {
-                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create`, playerId, { headers, responseType: 'text' as 'json' });
+                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create`, null, { responseType: 'text' as 'json' });
             }
             else {
-                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create?passcode=${passcode}`, playerId, { headers, responseType: 'text' as 'json' });
+                httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create?passcode=${passcode}`, null, { responseType: 'text' as 'json' });
             }
             httpObservable.subscribe({
                 next: (gameId) => {

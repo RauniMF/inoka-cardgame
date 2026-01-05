@@ -19,18 +19,52 @@ export class GameWebSocketService {
 
     connect(gameId: string): void {
         const socket = new SockJS('http://localhost:8080/ws');
+        const token = localStorage.getItem('authToken');
+        
+        if (!token) {
+            console.error('No authentication token found');
+            return;
+        }
+        
+        // console.log('Attempting WebSocket connection with token');
+        
         this.stompClient = new Client({
             webSocketFactory: () => socket,
-            reconnectDelay: 5000
+            reconnectDelay: 5000,
+            connectHeaders: {
+                Authorization: `Bearer ${token}`
+            },
+            debug: (str) => {
+                // console.log('STOMP Debug: ' + str);
+            }
         });
 
-        this.stompClient.onConnect = () => {
-            // console.log('Connected to WebSocket for gameId:', gameId);
-            this.stompClient.subscribe(`/topic/game/${gameId}`, (message: IMessage) => {
+        this.stompClient.onConnect = (frame) => {
+            // console.log('✅ WebSocket connected successfully', frame);
+            
+            // Subscribe to game updates
+            const subscription = this.stompClient.subscribe(`/topic/game/${gameId}`, (message: IMessage) => {
+                // console.log('📨 Received game update from WebSocket:', message.body);
                 const updatedGame: Game = JSON.parse(message.body);
-                // console.log('Received game update: ', updatedGame);
+                // console.log('🎮 Parsed game object:', updatedGame);
                 this.gameSubject.next(updatedGame);
             });
+            
+            // console.log('✅ Subscribed to /topic/game/' + gameId, subscription);
+        }
+
+        this.stompClient.onStompError = (frame) => {
+            // console.error('❌ WebSocket STOMP error:', frame);
+            // console.error('Error headers:', frame.headers);
+            // console.error('Error body:', frame.body);
+        }
+
+        this.stompClient.onWebSocketError = (error) => {
+            // console.error('❌ WebSocket connection error:', error);
+        }
+
+        this.stompClient.onWebSocketClose = (event) => {
+            // console.warn('⚠️ WebSocket connection closed:', event);
         }
 
         this.stompClient.activate();

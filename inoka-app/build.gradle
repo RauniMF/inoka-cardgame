@@ -42,6 +42,10 @@ dependencies {
 	testRuntimeOnly 'net.bytebuddy:byte-buddy-agent:1.15.1'
 }
 
+tasks.named('compileJava') {
+	options.compilerArgs.add('-parameters')
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
 	jvmArgs += "-javaagent:${configurations.mockitoAgent.asPath}"

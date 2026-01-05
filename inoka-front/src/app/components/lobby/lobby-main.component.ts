@@ -129,7 +129,15 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
             console.log("Game starting.");
             this.router.navigate(["/game"]);
           },
-          error: (e) => console.log("Could not start game in lobby-main: ", e)
+          error: (e) => {
+            // 409 Conflict means another player already started the game - this is fine
+            if (e.status === 409) {
+              console.log("Game already started by another player, navigating to game.");
+              this.router.navigate(["/game"]);
+            } else {
+              console.log("Could not start game in lobby-main: ", e);
+            }
+          }
         });
       }
     }, 1000);

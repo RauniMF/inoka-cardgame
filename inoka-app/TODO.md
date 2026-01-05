@@ -25,6 +25,9 @@
      - Update front-end to send Authorization header in each API call
      - User calls addPlayer and saves UUID to localStorage when first opening webapp
           - **Update addPlayer method and other API calls to require authentication**
+     - Refactor WebSocket Game objects to obfuscate sensitive player information like UUID
+          - Figure out how to properly identify users via custom IDs in Game object, as well has how to identify the user's Player object in the array using thisPlayer() method in playmat
+          - Modify Game object to assign pseudo-IDs when adding Player objects to the game
 
 > Implement front end
 - Get page setup for basic implementation

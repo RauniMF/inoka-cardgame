@@ -3,7 +3,7 @@ import { BrowserModule } from '@angular/platform-browser';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
-import { HttpClient, provideHttpClient, withFetch } from '@angular/common/http';
+import { HttpClient, provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { UserComponent } from './components/front-page/user.component';
 import { FormsModule } from '@angular/forms';
 import { GameService } from './services/game.service';
@@ -17,6 +17,7 @@ import { CardComponent } from './components/playmat/card/card.component';
 import { HandComponent } from './components/playmat/hand/hand.component';
 import { CommonModule } from '@angular/common';
 import { PlayerEntryComponent } from './components/lobby/player-entry/player-entry.component';
+import { authInterceptor } from './services/auth.interceptor';
 
 @NgModule({
   declarations: [
@@ -38,7 +39,7 @@ import { PlayerEntryComponent } from './components/lobby/player-entry/player-ent
     HandComponent
   ],
   providers: [
-    provideHttpClient(withFetch()),
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
     HttpClient,
     GameService,
     GameWebSocketService
