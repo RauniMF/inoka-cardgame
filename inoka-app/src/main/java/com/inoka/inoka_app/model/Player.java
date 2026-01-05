@@ -8,8 +8,6 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PostLoad;
 import jakarta.persistence.Table;
@@ -17,7 +15,7 @@ import jakarta.persistence.Transient;
 
 @Entity
 @Table(name="players")
-public class Player implements Serializable{
+public class Player implements Serializable {
     @Id
     @Column(name = "play_id", nullable = true, updatable = false, length = 128)
     private String id;

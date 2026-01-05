@@ -7,11 +7,11 @@ import { Subscription } from 'rxjs';
 @Component({
     selector: 'app-user',
     template: `
-    @if ( player != null && player.name !== '') {
-        <i>Welcome, {{ player.name }}</i>
+    @if ( player == null || !player.name.trim() ) {
+        Enter a name
     }
     @else {
-        Enter a username
+        <i>Welcome, {{ player.name }}</i>
     }
     <br/><br/>
     <label for="username">Enter your name:</label><br>
@@ -32,6 +32,8 @@ export class UserComponent implements OnInit, OnDestroy {
     this.playerSubscription = this.gameService.player$.subscribe(
       (player) => {
         this.player = player;
+        // INFO:
+        // console.log(this.player);
       }
     );
   }

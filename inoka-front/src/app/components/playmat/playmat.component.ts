@@ -27,6 +27,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   cardsInPlay: Map<string, Card> = new Map();
   gameStatus = signal("");
   private prevGameState: GameState | null = null;
+  handState: string | null = null;
   // Cards put in play are flipped over (i.e not revealed)
   cardsNotRevealed = true;
   userTurn = false;
@@ -55,7 +56,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     this.playerSubscription = this.gameService.player$.subscribe({
       next: (player) => {
         this.player = player;
-
+        
         if (this.player?.gameId && this.player.gameId !== 'Not in game') {
           const playerId = this.player.id;
     
@@ -101,6 +102,10 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     });
   }
 
+  thisPlayer(): Player | null {
+    return this.players.find(p => p.id == this.player?.id) ?? null;
+  }
+
   otherPlayers(): Player[] {
     if (!this.player) return this.players;
     return this.players.filter(p => p.id !== this.player?.id);
@@ -124,6 +129,9 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     switch(state) {
       case GameState.DRAWING_CARDS:
         //console.log("State reached: Drawing cards.")
+        this.cardsNotRevealed = true;
+        this.handSuppressed = false;
+        if (this.selectedCard) this.selectedCard = null;
         this.displayStateVisuals(state);
         break;
       case GameState.COUNT_DOWN:
@@ -201,6 +209,10 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         this.handSuppressed = true;
         if (this.selectedCard?.curHp! <= 0) this.selectedCard = null;
         this.gameStatus.set(`${this.winnerName()} won the clash!`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Start next clash
+        this.gameStatus.set("Starting new clash...");
+        this.gameWebSocketService.startNewClash(this.game?.id!);
         break;
     }
   }

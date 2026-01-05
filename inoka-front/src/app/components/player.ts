@@ -3,4 +3,5 @@ export interface Player {
     name: string;
     gameId?: string;
     ready: boolean;
+    sacredStones: number;
 }

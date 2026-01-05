@@ -1,11 +1,3 @@
-app-hand {
-    position: absolute;
-    margin: 0%;
-    left: 0%;
-    width: 100%;
-    bottom: 2vh;
-}
-
 .playmat-container {
     width: 100%;
     height: calc(100vh - 20vh);
@@ -17,9 +9,10 @@ app-hand {
     align-items: center;
 }
 
-.playmat-container p {
-    font-size: 1.3vw;
+.playmat-container h2 {
+    font-size: 1.5vw;
     font-style: italic;
+    font-weight: normal;
     margin: 0;
 }
 
@@ -28,6 +21,7 @@ app-hand {
     height: 100%;
     display: grid;
     position: relative;
+    z-index: 1;
 }
 
 .player-position {
@@ -40,13 +34,28 @@ app-hand {
 
 .player-name {
     margin-bottom: 1vw;
-    font-size: 1.2vw;
     color: white;
     text-shadow: 1px 1px 2px black;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.player-name h3, p {
+  font-size: 1.2vw;
+  margin: 0.1vw;
+}
+
+.player-name h3 {
+  font-size: 1.4vw;
 }
 
 .current-player-name {
     font-weight: bold;
+}
+
+#userPoints {
+  margin-top: 1vw;
 }
 
 .players-2 {
@@ -179,7 +188,7 @@ app-hand {
   background-color: rgba(235, 235, 235, 1);;
   width: 4vw;
   aspect-ratio: 5/2;
-  z-index: 10;
+  z-index: 3;
 }
 
 .attack-btn {
@@ -206,10 +215,42 @@ app-hand {
   white-space: nowrap;
   text-align: center;
   margin: 1%;
+  margin-bottom: 0;
+}
+
+.hand-container {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0%;
+  left: 0%;
+  bottom: 2vh;
+  z-index: 2;
+}
+
+.hand-container.stowed {
+  width:fit-content;
+}
+
+.hand-container.choosing,
+.hand-container.display {
+  width: 100%;
+  height: 40%;
+  z-index: 4;
+}
+
+.hand-container app-hand {
+  position: relative;
+  margin: 0%;
+  left: 0%;
+  width: 100%;
+  bottom: -20%;
+  z-index: 4;
 }
 
 .forfeit-btn {
-  /* TODO - Fix placement on page */
+  position: relative;
   width: 4vw;
   height: auto;
   font-size: 0.8vw;

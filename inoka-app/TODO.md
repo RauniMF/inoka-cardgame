@@ -13,6 +13,21 @@
 - GameWebSocketController message handling (DONE)
 - Broadcasts using ScheduledExecutorService in GameService (Done)
 - Games map as ConcurrentHashMap + synchronized() implementation for Game object modification (Done)
+- Look at refactoring GameService
+     - Currently handles all business logic operations between the controller and repository layers, which includes basic crud operations with the database & higher level game logic
+     - Might be beneficial to separate the crud operations into a PlayerService (Done)
+- Expand on unit and integration tests
+     - Update existing tests to spoof the service layer with mockito (Done)
+     - Implement restful api mvc test cases with MockMVC or a similar framework
+- Authentication and Security
+     - Implement authentication using JWT for session tokens
+     - Store user token in secure cookie
+     - Update front-end to send Authorization header in each API call
+     - User calls addPlayer and saves UUID to localStorage when first opening webapp
+          - **Update addPlayer method and other API calls to require authentication**
+     - Refactor WebSocket Game objects to obfuscate sensitive player information like UUID
+          - Figure out how to properly identify users via custom IDs in Game object, as well has how to identify the user's Player object in the array using thisPlayer() method in playmat
+          - Modify Game object to assign pseudo-IDs when adding Player objects to the game
 
 > Implement front end
 - Get page setup for basic implementation
@@ -42,14 +57,29 @@
 - Go in initiative order, player chooses move
      - **Cooldown between actions: i.e. show player roll value for some time before moving onto next state** (Done)
      - Player decision: Choose card to attack, skip turn, or forfeit from clash
-          - Implement forfeit option
-               - Remove player card & display they've chosen to forfeit on the following CLASH_PROCESSING_DECISION
+          - Implement forfeit option (Done)
+               - Remove player card & display they've chosen to forfeit on the following CLASH_PROCESSING_DECISION (Done)
 - Process the move and move onto next player
      - **Picking up a knockout: Player's card receives totem & regains d12 hp** (Done)
      - Player whose card was knocked out: Can choose to either put another card in play or forfeit from the clash
           - Implement forfeit option
-               - Remove player card & remove them from initiative order
+               - Remove player card & remove them from initiative order (Testing required)
                - **Display player chose to forfeit on front-end**
-     - Winning a clash: Be the last card standing. Winner receives a sacred stone
+     - Winning a clash: Be the last card standing. Winner receives a sacred stone (Done)
 - Process by game state
+      - Display each opponent's sacred stone count
+      - Display user's sacred stone count
+      - Conclude game (finishing screen w/ players ranked by stones obtained)
+      - Route back to front page after cleaning up game
 - Develop each game state
+- Option to leave lobby / game
+
+> Other in-game features
+- Class features
+     - Attacker: Once per card attack bonus
+     - Defender: Once per card healing bonus, heal hp with totem
+     - Taunter/Trickster: Charges can be expended to react to oncoming damage, reducing damage.
+- Game chat
+     - Store and display "logs" i.e. game status messages
+     - Player chat
+     - Toggle logs

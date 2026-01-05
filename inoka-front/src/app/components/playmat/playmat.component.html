@@ -1,12 +1,7 @@
 <div class="playmat-container" (click)="toggleDropdown($event, undefined)">
-    <p> {{ gameStatus() }} </p>
+    <h2> {{ gameStatus() }} </h2>
     <div class="players-grid" [ngClass]="'players-' + (players.length || 1)">
         <div class="player-position current-player-position">
-        @if (isForfeitButtonPresent()) {
-            <button class="forfeit-btn" (click)="$event.stopPropagation(); forfeitFromClash()">
-                Forfeit
-            </button>
-        }
         @if (selectedCard) {
             <app-card
                 [card]="selectedCard"
@@ -18,12 +13,20 @@
                     Skip Turn
                 </button>
             }
+            @if (thisPlayer(); as player){
+                <div class="player-name">
+                    <p id="userPoints" title="Your sacred stones"> {{ player.sacredStones }} </p>
+                </div>
+            }
         }
         </div>
     
         @for (player of otherPlayers(); track player.id; let index = $index) {
         <div class="player-position" [ngClass]="'position-' + (index + 1)">
-            <div class="player-name">{{ player.name }}</div>
+            <div class="player-name">
+                <h3>{{ player.name }}</h3>
+                <p>{{ player.sacredStones }}</p>
+            </div>
             @if (cardsInPlay.has(player.id)) {
                 <app-card
                     [card]="cardsInPlay.get(player.id)!"
@@ -35,26 +38,32 @@
         }
     </div>
     @if (dropdownData[2]) {
-        @if (selectedPlayerId != this.player?.id) {
         <div class="floating-dropdown" [style.left.px]="dropdownData[0]" [style.top.px]="dropdownData[1]">
+            @if (selectedPlayerId != this.player?.id) {
             <button
                 class="attack-btn"
                 (click)="$event.stopPropagation(); attackCard($event, selectedPlayerId!)"
             >Attack</button>
-        </div>
-        }
-        @else {
-        <div class="floating-dropdown" [style.left.px]="dropdownData[0]" [style.top.px]="dropdownData[1]">
+            }
+            @else {
             <button
                 class="attack-btn"
                 (click)="$event.stopPropagation(); forfeitFromClash()"
             >Forfeit</button>
+            }
         </div>
-        }
     }
 </div>
-<app-hand
-    [existingCard]="selectedCard"
-    [suppressChoosing]="handSuppressed"
-    (selectedCardEmitter)="selectedCard = $event"
-/>
+<div class="hand-container" [ngClass]="handState">
+    @if (isForfeitButtonPresent()) {
+        <button class="forfeit-btn" (click)="$event.stopPropagation(); forfeitFromClash()">
+            Forfeit
+        </button>
+    }
+    <app-hand
+        [existingCard]="selectedCard"
+        [suppressChoosing]="handSuppressed"
+        (selectedCardEmitter)="selectedCard = $event"
+        (handStateEmitter)="handState = $event"
+    />
+</div>

@@ -1,103 +1,65 @@
 package com.inoka.inoka_app.service;
 
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import com.inoka.inoka_app.event.GameUpdateEvent;
 import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.model.Action;
 import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.CardStyle;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
-import com.inoka.inoka_app.repositories.PlayerRepository;
 
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.List;
 
 @Service
 public class GameService {
     // Repo containing player data (name, id, gameid)
-    private final PlayerRepository gameRepo;
+    private final PlayerService playerService;
+
+    private final ApplicationEventPublisher eventPublisher;
     // Transient game data stored in HashMap
     private final ConcurrentHashMap<String, Game> games = new ConcurrentHashMap<>();;
 
-    // Handle broadcasting changes made to Game objects
-    private final SimpMessagingTemplate messagingTemplate;
-    private final CopyOnWriteArraySet<String> pendingGameUpdates = new CopyOnWriteArraySet<>();
-    private final ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-
-    public GameService(PlayerRepository gameRepo, SimpMessagingTemplate messagingTemplate) {
-        this.gameRepo = gameRepo;
-        this.messagingTemplate = messagingTemplate;
-        scheduler.initialize();
-        startBatchUpdateTask();
+    public GameService(PlayerService playerService, ApplicationEventPublisher eventPublisher) {
+        this.playerService = playerService;
+        this.eventPublisher = eventPublisher;
     }
-
-    // Broadcasts pending changes to Game objects on a fixed 500ms interval
-    private void startBatchUpdateTask() {
-        scheduler.scheduleAtFixedRate(this::broadcastPendingUpdates, Duration.ofMillis(500));
-    }
-
-    private void broadcastPendingUpdates() {
-        for (String gameId: pendingGameUpdates) {
-            games.computeIfPresent(gameId, (String id, Game game) -> {
-                synchronized (game) {
-                    messagingTemplate.convertAndSend("/topic/game/"+ game.getId(), game);
-                }
-                return game;
-            });
-        }
-        pendingGameUpdates.clear();
-    }
-
-    public void queueGameUpdate(String gameId) {
-        pendingGameUpdates.add(gameId);
-    }
-
-    public Player addPlayer(Player player) {
-        return gameRepo.save(player);
-    }
-    public List<Player> findAllPlayers() {
-        return gameRepo.findAll();
-    }
-    public boolean updatePlayer(String id, String name) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(id);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
-            player.setName(name);
-            gameRepo.save(player);
-            return true;
-        } else {
-            return false;
+    
+    
+    private void publishGameUpdate(String gameId) {
+        Game game = games.get(gameId);
+        if (game != null) {
+            eventPublisher.publishEvent(new GameUpdateEvent(this, game));
         }
     }
-    public boolean removePlayerById(String id) {
-        if (gameRepo.existsById(id)) {
-            gameRepo.deleteById(id);
-            return true;
-        }
-        else {
-            return false;
-        }
+    
+    public void addGame(Game game) {
+        games.put(game.getId(), game);
     }
-    public Player findPlayerById(String id) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(id);
-        if (playerCheck.isPresent()) {
-            return playerCheck.get();
-        }
-        return null;
+    
+    public void removeGame(String id) {
+        games.remove(id);
     }
-    public void removeAllPlayers() {
-        gameRepo.deleteAll();
+    
+    public List<Game> getAllGames() {
+        return new ArrayList<>(games.values());
     }
+
+    public Optional<Game> getGameById(String gameId) {
+        return Optional.ofNullable(this.games.get(gameId));
+    }
+
+    public boolean gameWithIdExists(String gameId) {
+        return this.games.contains(gameId);
+    }
+
     public Optional<List<Card>> getPlayerDeck(String playerId) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        Optional<Player> playerCheck = playerService.findPlayerById(playerId);
         if (!playerCheck.isPresent()) {
             return Optional.empty();
         }
@@ -120,25 +82,10 @@ public class GameService {
      * Creates or joins existing game
      */
     public synchronized Game createGame(String passcode, Player player) {
-        if (passcode == null || passcode.isEmpty()) {
-            // Check if there's an existing game without a passcode and in WAITING_FOR_PLAYERS state
-            for (Game game : games.values()) {
-                if ((game.getPasscode() == null || game.getPasscode().isEmpty()) && game.getState() == GameState.WAITING_FOR_PLAYERS) {
-                    // Add the player to the existing game
-                    this.addPlayerToGame(game.getId(), player);
-                    return game;
-                }
-            }
-        }
-        // Check if there's a game with the same passcode and in WAITING_FOR_PLAYERS state
-        for (Game game : games.values()) {
-            if (game.getPasscode() != null && game.getPasscode().equals(passcode)) {
-                if (game.getState() == GameState.WAITING_FOR_PLAYERS) {
-                    this.addPlayerToGame(game.getId(), player);
-                    return game;
-                }
-            }
-        }
+        // Check if player can join existing game
+        // Can also use .orElseGet() for more succinct code but I think this is a little more readable
+        Optional<Game> gameCheck = this.joinGame(passcode, player);
+        if (gameCheck.isPresent()) return gameCheck.get();
 
         // If no suitable game was found, create a new game with the given passcode
         Game game = (passcode != null && !passcode.isEmpty()) ? new Game(passcode) : new Game();
@@ -146,32 +93,45 @@ public class GameService {
         this.addPlayerToGame(game.getId(), player);
         return game;
     }
-
-    public Game getGame(String id) {
-        return games.get(id);
-    }
-    public void addGame(Game game) {
-        games.put(game.getId(), game);
-    }
-    public void removeGame(String id) {
-        games.remove(id);
-    }
-    public Map<String,Game> getAllGames() {
-        return games;
+    
+    /*
+     * Joins game if game exists & game.numPlayers() < 6
+     */
+    public synchronized Optional<Game> joinGame(String passcode, Player player) {
+        // Checks if player can join existing game
+        for (Game game : games.values()) {
+            if (passcode == null || passcode.isEmpty()) {
+                // No passcode
+                if ((game.getPasscode() == null || game.getPasscode().isEmpty()) &&
+                    (game.getState() == GameState.WAITING_FOR_PLAYERS) &&
+                    (game.numPlayers() < 6)) {
+                    // Add the player to the existing game
+                    this.addPlayerToGame(game.getId(), player);
+                    return Optional.of(game);
+                }
+            }
+            else {
+                // passcode
+                if ((game.getPasscode() != null && game.getPasscode().equals(passcode)) &&
+                    (game.getState() == GameState.WAITING_FOR_PLAYERS) &&
+                    (game.numPlayers() < 6)) {
+                    this.addPlayerToGame(game.getId(), player);
+                    return Optional.of(game);
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     /*
-     * Given a passcode,
-     * Add player to open lobby with passcode
-     * Returns true if player was successfully added
-     * Else, false
+     * Handles adding player to game object
      */
     public void addPlayerToGame(String gameId, Player player) {
         games.computeIfPresent(gameId, (id, game) -> {
             synchronized (game) {
                 game.addPlayer(player);
-                gameRepo.save(player);
-                queueGameUpdate(gameId);
+                this.playerService.savePlayer(player);
+                this.publishGameUpdate(gameId);
                 return game;
             }
         });
@@ -202,7 +162,7 @@ public class GameService {
      * else false
      */
     public boolean setPlayerReady(String playerId) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
         if (playerCheck.isPresent()) {
             Player player = playerCheck.get();
             // Set player ready in transient Game data
@@ -212,11 +172,11 @@ public class GameService {
                 synchronized (game) {
                     Player playerTransient = game.getPlayer(player.getId());
                     playerTransient.setReady(true);
-                    queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                     return game;
                 }
             });
-            return true;
+            return games.get(gameId).getPlayer(playerId).isReady();
         } else {
             return false;
         }
@@ -246,14 +206,20 @@ public class GameService {
      * set the GameState to DRAWING_CARDS
      * and queue broadcast
      */
-    public void setGameStart(String gameId) {
+    public boolean setGameStart(String gameId) {
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
         games.computeIfPresent(gameId, (id, game) -> {
             synchronized (game) {
-                game.setState(GameState.DRAWING_CARDS);
-                queueGameUpdate(gameId);
+                if (game.getState() == GameState.WAITING_FOR_PLAYERS && this.allPlayersReady(gameId).get()) {
+                    game.setState(GameState.DRAWING_CARDS);
+                    result.set(0, true);
+                    this.publishGameUpdate(gameId);
+                }
                 return game;
             }
         });
+        return result.get(0);
     }
 
     public boolean setClashStart(String gameId) {
@@ -261,13 +227,30 @@ public class GameService {
         result.add(false);
         games.computeIfPresent(gameId, (id, game) -> {
             synchronized (game) {
-                if (game.getState() == GameState.COUNT_DOWN ||
-                    game.getState() == GameState.CLASH_CONCLUDED) {
+                if (game.getState() == GameState.COUNT_DOWN) {
                         game.setState(GameState.CLASH_ROLL_INIT);
                         // Initiative values are re-rolled at start of clash
                         game.resetInitiativeValue();
                         result.set(0, true);
-                        queueGameUpdate(gameId);
+                        this.publishGameUpdate(gameId);
+                    }
+                return game;
+            }
+        });
+        return result.get(0);
+    }
+
+    public boolean startNewClash(String gameId) {
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                if (game.getState() == GameState.CLASH_CONCLUDED) {
+                        game.setState(GameState.DRAWING_CARDS);
+                        // Remove cards from play
+                        game.removeAllCardsFromPlay();
+                        result.set(0, true);
+                        this.publishGameUpdate(gameId);
                     }
                 return game;
             }
@@ -285,7 +268,7 @@ public class GameService {
                     // Move onto next player's turn
                     game.determineNextInitiativeValue();
                     result.set(0, true);
-                    queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                 }
                 return game;
             }
@@ -300,7 +283,7 @@ public class GameService {
      * Returns true if successful, false otherwise
      */
     public boolean putCardInPlay(String playerId, Card card) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
         if (playerCheck.isPresent()) {
             Player player = playerCheck.get();
 
@@ -330,7 +313,7 @@ public class GameService {
                         game.setState(GameState.CLASH_PLAYER_TURN);
                         game.determineNextInitiativeValue();
                     }
-                    queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                     return game;
                 }
             });
@@ -341,7 +324,7 @@ public class GameService {
     }
 
     public int rollInitForPlayer(String playerId) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
         if (playerCheck.isPresent()) {
             Player player = playerCheck.get();
 
@@ -370,7 +353,7 @@ public class GameService {
                             game.determineNextInitiativeValue();
                         }
                     }
-                    queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                     return game;
                 }
             });
@@ -388,7 +371,7 @@ public class GameService {
      * or -1 if the player chose to skip their turn
      */
     public int resolveClashAction(String dealingPlayerId, String receivingPlayerId) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(dealingPlayerId);
+        Optional<Player> playerCheck = this.playerService.findPlayerById(dealingPlayerId);
         final List<Integer> result = new ArrayList<>(1);
         result.add(-1);
         if (playerCheck.isPresent()) {
@@ -403,7 +386,7 @@ public class GameService {
                     }
                     game.setLastAction(dealingPlayerId, receivingPlayerId, result.get(0));
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
-                    queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                     return game;
                 }
             });
@@ -413,7 +396,7 @@ public class GameService {
 
     // Remove player's card from play
     public boolean removePlayerCardInPlay(String playerId) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
         if (playerCheck.isPresent()) {
@@ -426,7 +409,7 @@ public class GameService {
                     if (removedCard != null) {
                         result.set(0, true);
                         if (game.getState() == GameState.CLASH_PROCESSING_DECISION) game.setState(GameState.CLASH_PLAYER_REPLACING_CARD);
-                        queueGameUpdate(gameId);
+                        this.publishGameUpdate(gameId);
                     }
                     return game;
                 }
@@ -441,7 +424,7 @@ public class GameService {
      * return true if successful, false otherwise
      */
     public boolean playerPickUpKnockout(String playerId) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
         if (playerCheck.isPresent()) {
@@ -466,13 +449,13 @@ public class GameService {
                             else {
                                 game.setState(GameState.CLASH_CONCLUDED);
                             }
-                            queueGameUpdate(gameId);
+                            this.publishGameUpdate(gameId);
                             return game;
                         }
                         // Otherwise, give player's card totem & heal
                         game.resetCardsTotem(); // Only one player can have totem
                         game.playerGiveTotem(playerId);
-                        queueGameUpdate(gameId);
+                        this.publishGameUpdate(gameId);
                     }
                     return game;
                 }
@@ -487,7 +470,7 @@ public class GameService {
      * and remove them from the initiative order
      */
     public void playerForfeitClash(String playerId) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
         
         if (playerCheck.isPresent()) {
             Player player = playerCheck.get();
@@ -504,7 +487,7 @@ public class GameService {
                     // Update game state & last action
                     game.setLastAction("null", playerId, -1);
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
-                    queueGameUpdate(gameId);
+                    this.publishGameUpdate(gameId);
                     return game;
                 }
             });
@@ -517,7 +500,7 @@ public class GameService {
      * then award them if they won
      */
     public boolean playerWonClash(String playerId) {
-        Optional<Player> playerCheck = gameRepo.findPlayerById(playerId);
+        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
         if (playerCheck.isPresent()) {
@@ -537,7 +520,7 @@ public class GameService {
                             game.setState(GameState.CLASH_CONCLUDED);
                         }
                         result.set(0, true);
-                        queueGameUpdate(gameId);
+                        this.publishGameUpdate(gameId);
                     }
                     return game;
                 }
