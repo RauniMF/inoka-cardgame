@@ -19,6 +19,8 @@
 - Expand on unit and integration tests
      - Update existing tests to spoof the service layer with mockito (Done)
      - Implement restful api mvc test cases with MockMVC or a similar framework
+     - Test security classes
+     - More test coverage
 - Authentication and Security
      - Implement authentication using JWT for session tokens
      - Store user token in secure cookie
@@ -28,6 +30,14 @@
      - Refactor WebSocket Game objects to obfuscate sensitive player information like UUID
           - Figure out how to properly identify users via custom IDs in Game object, as well has how to identify the user's Player object in the array using thisPlayer() method in playmat
           - Modify Game object to assign pseudo-IDs when adding Player objects to the game
+          - **Implement planned changes**
+               - Backend model changes: Add player seat management methods in Game object
+               - Create DTO classes (GameView, PlayerView & ActionView)
+               - Update SchedulerService, GameController & GameWebSocketController to broadcast GameViews and user-specific decks
+               - Front-end model changes (implement DTOs)
+               - Update game.service.ts and game-websocket.service.ts to utilize new DTOs
+               - Update Hand component to utilize new deckSubscription observable provided by the websocket
+               - Modify Playmat component to utilize new DTO to identify players in the view and when sending player action to back-end
 
 > Implement front end
 - Get page setup for basic implementation

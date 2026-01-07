@@ -7,9 +7,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Game {
     private String id;
@@ -24,6 +26,9 @@ public class Game {
     // Initiative Value --> Player UUID
     private Map<Integer, String> initiativeMap;
     private Action lastAction;
+    // Player UUID --> Associated seat number
+    private Map<String, Integer> playerSeats;
+    private AtomicInteger nextSeat;
     
     public Game() {
         this.id = UUID.randomUUID().toString();
@@ -35,6 +40,8 @@ public class Game {
         this.currentInitiativeValue = -1;
         this.initiativeMap = new HashMap<>();
         this.lastAction = new Action();
+        this.playerSeats = new HashMap<>();
+        this.nextSeat = new AtomicInteger(1);
     }
 
     public Game(String passcode) {
@@ -47,6 +54,8 @@ public class Game {
         this.currentInitiativeValue = -1;
         this.initiativeMap = new HashMap<>();
         this.lastAction = new Action();
+        this.playerSeats = new HashMap<>();
+        this.nextSeat = new AtomicInteger(1);
     }
 
     public String getId() {
@@ -55,6 +64,9 @@ public class Game {
 
     public void addPlayer(Player player) {
         if (!players.keySet().contains(player.getId())) {
+            // Assign seat to player
+            int seat = nextSeat.getAndIncrement();
+            this.playerSeats.put(player.getId(), seat);
             // Roll new initiative value
             player.rollInitiative();
             // Update player gameId
@@ -121,6 +133,9 @@ public class Game {
         this.cardsInPlay.put(playerId, card);
     }
 
+    public int getAddSubDice(){
+        return this.addSubDice;
+    }
     public void setAddSubDice(int diceSize) {
         this.addSubDice = diceSize;
     }
@@ -257,5 +272,16 @@ public class Game {
         receivingCard.removeCurHp(damage);
         this.cardsInPlay.put(receivingPlayerId, receivingCard);
         return damage;
+    }
+
+    public int getSeatForPlayer(String playerId) {
+        return this.playerSeats.getOrDefault(playerId, -1);
+    }
+    public Optional<String> getPlayerIdBySeat(int seat) {
+        return Optional.ofNullable(this.playerSeats.entrySet().stream()
+            .filter(e -> e.getValue() == seat)
+            .map(Map.Entry::getKey)
+            .findFirst()
+            .orElse(null));
     }
 }
