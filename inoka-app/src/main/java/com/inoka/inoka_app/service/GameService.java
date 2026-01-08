@@ -30,7 +30,7 @@ public class GameService {
         this.eventPublisher = eventPublisher;
     }
     
-    
+    // TODO: Revisit concurrent implementation
     private void publishGameUpdate(String gameId) {
         Game game = games.get(gameId);
         if (game != null) {
@@ -58,12 +58,20 @@ public class GameService {
         return this.games.contains(gameId);
     }
 
+    public Optional<Game> getGameByPlayerId(String playerId) {
+        Optional<Player> playerOpt = playerService.findPlayerById(playerId);
+        if (playerOpt.isEmpty()) return Optional.empty();
+
+        String gameId = playerOpt.get().getGameId();
+        return this.getGameById(gameId);
+    }
+
     public Optional<List<Card>> getPlayerDeck(String playerId) {
-        Optional<Player> playerCheck = playerService.findPlayerById(playerId);
-        if (!playerCheck.isPresent()) {
+        Optional<Player> playerOpt = playerService.findPlayerById(playerId);
+        if (!playerOpt.isPresent()) {
             return Optional.empty();
         }
-        Player playerTransient = playerCheck.get();
+        Player playerTransient = playerOpt.get();
         String gameId = playerTransient.getGameId();
         if ((gameId.equals("Not in game")) || (gameId == null) || (gameId.isEmpty())) {
             return Optional.empty();
@@ -84,8 +92,8 @@ public class GameService {
     public synchronized Game createGame(String passcode, Player player) {
         // Check if player can join existing game
         // Can also use .orElseGet() for more succinct code but I think this is a little more readable
-        Optional<Game> gameCheck = this.joinGame(passcode, player);
-        if (gameCheck.isPresent()) return gameCheck.get();
+        Optional<Game> gameOpt = this.joinGame(passcode, player);
+        if (gameOpt.isPresent()) return gameOpt.get();
 
         // If no suitable game was found, create a new game with the given passcode
         Game game = (passcode != null && !passcode.isEmpty()) ? new Game(passcode) : new Game();
@@ -162,9 +170,9 @@ public class GameService {
      * else false
      */
     public boolean setPlayerReady(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
             // Set player ready in transient Game data
             String gameId = player.getGameId();
             
@@ -190,13 +198,13 @@ public class GameService {
      * Returns false otherwise
      */
     public Optional<Boolean> allPlayersReady(String gameId) {
-        Optional<List<Player>> playersCheck = this.getPlayersInGame(gameId);
+        Optional<List<Player>> playersListOpt = this.getPlayersInGame(gameId);
 
-        if (playersCheck.isEmpty()) {
+        if (playersListOpt.isEmpty()) {
             return Optional.empty();
         }
 
-        for (Player player : playersCheck.get()) if(!player.isReady()) return Optional.of(false);
+        for (Player player : playersListOpt.get()) if(!player.isReady()) return Optional.of(false);
 
         return Optional.of(true);
     }
@@ -283,9 +291,9 @@ public class GameService {
      * Returns true if successful, false otherwise
      */
     public boolean putCardInPlay(String playerId, Card card) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
@@ -324,9 +332,9 @@ public class GameService {
     }
 
     public int rollInitForPlayer(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
@@ -371,11 +379,11 @@ public class GameService {
      * or -1 if the player chose to skip their turn
      */
     public int resolveClashAction(String dealingPlayerId, String receivingPlayerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(dealingPlayerId);
+        Optional<Player> playerOpt = this.playerService.findPlayerById(dealingPlayerId);
         final List<Integer> result = new ArrayList<>(1);
         result.add(-1);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
@@ -396,11 +404,11 @@ public class GameService {
 
     // Remove player's card from play
     public boolean removePlayerCardInPlay(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
@@ -424,11 +432,11 @@ public class GameService {
      * return true if successful, false otherwise
      */
     public boolean playerPickUpKnockout(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
@@ -470,10 +478,10 @@ public class GameService {
      * and remove them from the initiative order
      */
     public void playerForfeitClash(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
         
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
@@ -500,11 +508,11 @@ public class GameService {
      * then award them if they won
      */
     public boolean playerWonClash(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {

@@ -31,8 +31,6 @@
           - Figure out how to properly identify users via custom IDs in Game object, as well has how to identify the user's Player object in the array using thisPlayer() method in playmat
           - Modify Game object to assign pseudo-IDs when adding Player objects to the game
           - **Implement planned changes**
-               - Backend model changes: Add player seat management methods in Game object
-               - Create DTO classes (GameView, PlayerView & ActionView)
                - Update SchedulerService, GameController & GameWebSocketController to broadcast GameViews and user-specific decks
                - Front-end model changes (implement DTOs)
                - Update game.service.ts and game-websocket.service.ts to utilize new DTOs

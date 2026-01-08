@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.Game;
+import com.inoka.inoka_app.model.GameView;
 import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.model.PlayerEntry;
 import com.inoka.inoka_app.security.JwtUtil;
@@ -172,7 +173,7 @@ public class GameController {
     }
 
     @GetMapping("/game/find")
-    public ResponseEntity<Game> findGameByGameId(@AuthenticationPrincipal PlayerPrincipal principal) {
+    public ResponseEntity<GameView> findGameByGameId(@AuthenticationPrincipal PlayerPrincipal principal) {
         if (principal == null) {
             return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }
@@ -180,8 +181,12 @@ public class GameController {
         Player player = principal.getPlayer();
         Optional<Game> game = gameService.getGameById(player.getGameId());
         
-        // TODO: Should only return information relevant to the player
-        return game.isPresent() ? ResponseEntity.ok(game.get()) : new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        if (game.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        GameView gameView = GameView.fromGame(game.get());
+        return ResponseEntity.ok(gameView);
     }
     
     @Deprecated
@@ -191,6 +196,7 @@ public class GameController {
         return ResponseEntity.ok(games);
     }
     
+    // TODO: Update to return DTO obscuring sensitive player data
     @GetMapping("/game/players")
     public ResponseEntity<List<Player>> getPlayersInGame(@RequestParam String id) {
         Optional<List<Player>> playersList = gameService.getPlayersInGame(id);
@@ -203,6 +209,7 @@ public class GameController {
         }
     }
 
+    // TODO: Change to accept principal
     @PutMapping(value = "/player/ready", consumes = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> setPlayerReady(@RequestBody String id) {
         boolean success = gameService.setPlayerReady(id);
@@ -243,6 +250,7 @@ public class GameController {
         return ResponseEntity.status(403).body("Unable to set GameState to CLASH_PLAYER_TURN.");
     }
 
+    // TODO: Change to accept principal
     @GetMapping("/player/rollinit")
     public ResponseEntity<Integer> rollInitiativeForPlayer(@RequestParam String id) {
         int result = gameService.rollInitForPlayer(id);
@@ -250,6 +258,7 @@ public class GameController {
         return ResponseEntity.ok(result);
     }
 
+    // TODO: Change to accept principal
     @DeleteMapping("/player/cardInPlay")
     public ResponseEntity<?> removeCardInPlay(@RequestParam String id) {
         boolean result = gameService.removePlayerCardInPlay(id);
@@ -257,6 +266,7 @@ public class GameController {
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
+    // TODO: Change to accept principal
     @PutMapping(value = "/player/gotKnockout", consumes = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<?> playerPickUpKnockout(@RequestBody String id) {
         boolean result = gameService.playerPickUpKnockout(id);
@@ -264,6 +274,7 @@ public class GameController {
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
+    // TODO: Change to accept principal
     @PutMapping(value = "/player/wonClash", consumes = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<?> playerWonClash(@RequestBody String id) {
         boolean result = gameService.playerWonClash(id);

@@ -1,6 +1,7 @@
 package com.inoka.inoka_app.service;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Service;
 
 import com.inoka.inoka_app.event.GameUpdateEvent;
 import com.inoka.inoka_app.model.Game;
+import com.inoka.inoka_app.model.Player;
+import com.inoka.inoka_app.model.GameView;
 
 @Service
 public class SchedulerService {
@@ -37,12 +40,25 @@ public class SchedulerService {
             logger.debug("Broadcasting {} pending game update(s)", pendingGameUpdates.size());
             
             for (Game game : pendingGameUpdates.values()) {
-                String destination = "/topic/game/" + game.getId();
-                messagingTemplate.convertAndSend(destination, game);
-                logger.debug("    Sent update for game {} to {}", game.getId(), destination);
-                logger.debug("    Game state: {}, Players: {}", 
-                    game.getState(), 
-                    game.getPlayers() != null ? game.getPlayers().size() : 0);
+                // Broadcast sanitized GameView to all players in the game
+                String gameDestination = "/topic/game/" + game.getId();
+                GameView gameView = GameView.fromGame(game);
+                messagingTemplate.convertAndSend(gameDestination, gameView);
+                logger.debug("Sent GameView for game {} to {}", game.getId(), gameDestination);
+                
+                // Send each player their private deck data
+                for (Map.Entry<String, Player> entry : game.getPlayers().entrySet()) {
+                    String playerId = entry.getKey();
+                    Player player = entry.getValue();
+                    
+                    // Send to user-specific queue: /user/{playerId}/queue/deck
+                    messagingTemplate.convertAndSendToUser(
+                        playerId,
+                        "/queue/deck",
+                        player.getDeck()
+                    );
+                    logger.debug("Sent deck update to player {} in game {}", playerId, game.getId());
+                }
             }
             
             pendingGameUpdates.clear();

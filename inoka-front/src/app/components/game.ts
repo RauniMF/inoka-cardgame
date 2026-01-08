@@ -16,6 +16,10 @@ export enum GameState {
     FINISHED = "FINISHED"
 }
 
+/**
+ *  @deprecated
+ *  Use GameView instead.
+ */
 export interface Game {
     id: string;
     players: Player[];
@@ -25,4 +29,31 @@ export interface Game {
     currentInitiativeValue: number;
     initiativeMap: Map<number, string>;
     lastAction: GameAction;
+}
+
+export interface GameView {
+    id: string;
+    state: string;
+    players: { [seat: number]: PlayerView };
+    cardsInPlay: { [seat: number]: Card };
+    addSubDice: number;
+    currentInitiativeValue: number;
+    initiativeMap: { [initiative: number]: number }; // Initiative -> Seat
+    lastAction: ActionView;
+    currentPlayerSeat?: number;
+}
+
+export interface PlayerView {
+    seat: number;
+    name: string;
+    isReady: boolean;
+    deckSize: number;
+    sacredStones: number;
+    initiative: number;
+}
+
+export interface ActionView {
+    dealingSeat?: number;
+    receivingSeat?: number;
+    damageDealt: number;
 }

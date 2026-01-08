@@ -1,7 +1,7 @@
 import { Injectable } from "@angular/core";
 import { Client, IMessage } from "@stomp/stompjs";
 import { BehaviorSubject, Observable } from "rxjs";
-import { Game } from "../components/game";
+import { Game, GameView } from "../components/game";
 import SockJS from "sockjs-client";
 import { Card } from "../components/card";
 
@@ -11,9 +11,11 @@ import { Card } from "../components/card";
 })
 export class GameWebSocketService {
     private stompClient!: Client;
-    private gameSubject = new BehaviorSubject<Game | null>(null);
+    private gameSubject = new BehaviorSubject<GameView | null>(null);
+    private deckSubject = new BehaviorSubject<Card[]>([]);
 
-    public gameUpdates$: Observable<Game | null> = this.gameSubject.asObservable();
+    public gameUpdates$: Observable<GameView | null> = this.gameSubject.asObservable();
+    public deckUpdates$: Observable<Card[] | null> = this.deckSubject.asObservable();
 
     constructor(){}
 
@@ -40,31 +42,34 @@ export class GameWebSocketService {
         });
 
         this.stompClient.onConnect = (frame) => {
-            // console.log('✅ WebSocket connected successfully', frame);
+            // console.log('WebSocket connected successfully', frame);
             
             // Subscribe to game updates
-            const subscription = this.stompClient.subscribe(`/topic/game/${gameId}`, (message: IMessage) => {
-                // console.log('📨 Received game update from WebSocket:', message.body);
-                const updatedGame: Game = JSON.parse(message.body);
-                // console.log('🎮 Parsed game object:', updatedGame);
+            this.stompClient.subscribe(`/topic/game/${gameId}`, (message: IMessage) => {
+                const updatedGame: GameView = JSON.parse(message.body);
+                // console.log('Parsed game object from websocket:', updatedGame);
                 this.gameSubject.next(updatedGame);
             });
+
+            // Subscribe to deck updates
+            this.stompClient.subscribe('user/queue/deck', (message: IMessage) => {
+                const deck: Card[] = JSON.parse(message.body);
+                this.deckSubject.next(deck);
+            });
             
-            // console.log('✅ Subscribed to /topic/game/' + gameId, subscription);
+            // console.log('Subscribed to /topic/game/' + gameId, subscription);
         }
 
         this.stompClient.onStompError = (frame) => {
-            // console.error('❌ WebSocket STOMP error:', frame);
-            // console.error('Error headers:', frame.headers);
-            // console.error('Error body:', frame.body);
+            console.error('WebSocket STOMP error:', frame);
         }
 
         this.stompClient.onWebSocketError = (error) => {
-            // console.error('❌ WebSocket connection error:', error);
+            console.error('WebSocket connection error:', error);
         }
 
         this.stompClient.onWebSocketClose = (event) => {
-            // console.warn('⚠️ WebSocket connection closed:', event);
+            console.warn('WebSocket connection closed:', event);
         }
 
         this.stompClient.activate();
@@ -103,19 +108,18 @@ export class GameWebSocketService {
         }
     }
 
-    playCard(playerId: string, card: Card): void {
+    playCard(card: Card): void {
         if (this.stompClient && this.stompClient.connected) {
-            const message = { playerId, card };
             this.stompClient.publish({
                 destination: "/app/playCard",
-                body: JSON.stringify(message)
+                body: JSON.stringify(card)
             })
         }
     }
 
-    resolveAction(userId: string, targetId: string): void {
+    resolveAction(targetSeat: number): void {
         if (this.stompClient && this.stompClient.connected) {
-            const message = { userId, targetId };
+            const message = { targetSeat };
             this.stompClient.publish({
                 destination: "/app/clashAction",
                 body: JSON.stringify(message)
@@ -123,20 +127,20 @@ export class GameWebSocketService {
         }
     }
 
-    pickedUpKnockout(playerId: string): void {
+    pickedUpKnockout(): void {
         if (this.stompClient && this.stompClient.connected) {
             this.stompClient.publish({
                 destination: "/app/gotKnockout",
-                body: playerId
+                body: ""
             })
         }
     }
 
-    playerForfeitClash(playerId: string): void {
+    playerForfeitClash(): void {
         if (this.stompClient && this.stompClient.connected) {
             this.stompClient.publish({
                 destination: "/app/clashForfeit",
-                body: playerId
+                body: ""
             })
         }
     }
