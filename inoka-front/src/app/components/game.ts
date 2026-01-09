@@ -34,7 +34,7 @@ export interface Game {
 export interface GameView {
     id: string;
     state: GameState;
-    players: { [seat: number]: PlayerView };
+    playerViews: { [seat: number]: PlayerView };
     cardsInPlay: { [seat: number]: Card };
     addSubDice: number;
     currentInitiativeValue: number;

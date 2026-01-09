@@ -21,6 +21,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
   private gameWebSocketService = inject(GameWebSocketService);
   
   public player: Player | null = null;
+  private game: GameView | null = null;
   players: PlayerView[] = [];
   lobbyStatus = signal("Waiting for players");
   private playerSubscription: Subscription | null = null;
@@ -44,22 +45,50 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
       next: (player) => {
         this.player = player;
 
+        // INFO: 
+        console.log("Player loaded: ", player);
+
         if (this.player?.gameId && this.player.gameId !== 'Not in game') {
-          const gameId = this.player.gameId;
-    
-          // Get all players data for lobby status
-          this.gameSubscription = this.gameWebSocketService.gameUpdates$.subscribe({
-            next: (gameUpdate) => {
-              if (gameUpdate) {
-                this.players = Array.isArray(gameUpdate.players) ? gameUpdate.players : Object.values(gameUpdate.players);
-                this.updateLobbyStatus();
+          this.gameService.getGame().subscribe({
+            next: (gameView) => {
+              if (gameView && gameView.id === this.player?.gameId) {
+                this.game = gameView;
+                // INFO:
+                // console.log("Game loaded: ", gameView);
+                // Get other players
+                if (this.game) {
+                  this.players = Array.isArray(this.game.playerViews) ? this.game.playerViews : Object.values(this.game.playerViews);
+                  console.log("Players loaded: ", this.players);
+                  this.updateLobbyStatus();
+                }
               }
             },
-            error: (e) => console.log("Could not fetch Game data in lobby-main: ", e)
+            error: (e) => {
+              if (e.status === 404) {
+                console.log("Player not in game.");
+              }
+              else {
+                console.log("Error fetching Game details: ", e);
+              }
+            }
           });
         }
       },
       error: (e) => console.error(`Could not fetch player data in lobby-main: `, e)
+    });
+
+    // Subscribe to WebSocket updates
+    this.gameSubscription = this.gameWebSocketService.gameUpdates$.subscribe({
+      next: (gameUpdate) => {
+        if (gameUpdate) {
+          this.game = gameUpdate;
+          // INFO:
+          // console.log("Game loaded from WebSocket: ", gameUpdate);
+          this.players = Array.isArray(gameUpdate.playerViews) ? gameUpdate.playerViews : Object.values(gameUpdate.playerViews);
+          this.updateLobbyStatus();
+        }
+      },
+      error: (e) => console.log("Could not fetch Game data in lobby-main: ", e)
     });
   }
 

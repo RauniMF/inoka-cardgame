@@ -7,7 +7,7 @@ public class GameView {
     private String id;
     private GameState state;
     // Seat number --> Associated PlayerView
-    private Map<Integer, PlayerView> players;
+    private Map<Integer, PlayerView> playerViews;
     // Seat number --> Associated player's Card
     private Map<Integer, Card> cardsInPlay;
     private int addSubDice;
@@ -68,7 +68,7 @@ public class GameView {
     }
 
     public GameView() {
-        this.players = new HashMap<>();
+        this.playerViews = new HashMap<>();
         this.cardsInPlay = new HashMap<>();
         this.initiativeMap = new HashMap<>();
     }
@@ -89,10 +89,10 @@ public class GameView {
     }
 
     public Map<Integer, PlayerView> getPlayerViews() {
-        return players;
+        return playerViews;
     }
     public void insertPlayerView(int seat, PlayerView playerView) {
-        this.players.put(seat, playerView);
+        this.playerViews.put(seat, playerView);
     }
 
     public Map<Integer, Card> getCardsInPlay() {

@@ -174,6 +174,11 @@ export class GameService {
         }
     }
 
+    // Receive existing game object
+    public getGame(): Observable<GameView> {
+        return this.http.get<GameView>(`${this.apiServerUrl}/game/find`);
+    }
+
     public removePlayer(): Observable<void> {
         return this.http.delete<void>(`${this.apiServerUrl}/player/remove`);
     }

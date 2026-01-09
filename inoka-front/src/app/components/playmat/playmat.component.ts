@@ -6,7 +6,7 @@ import { GameService } from '../../services/game.service';
 import { Subscription } from 'rxjs';
 import { Player } from '../player';
 import { CommonModule } from '@angular/common';
-import { Game, GameState, GameView } from '../game';
+import { ActionView, Game, GameState, GameView, PlayerView } from '../game';
 import { GameWebSocketService } from '../../services/game-websocket.service';
 import { GameAction } from '../gameAction';
 
@@ -23,8 +23,8 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   @Input() selectedCard: Card | null = null;
   handSuppressed: boolean = false;
 
-  players: Player[] = [];
-  cardsInPlay: Map<string, Card> = new Map();
+  players: PlayerView[] = [];
+  cardsInPlay: Map<number, Card> = new Map(); // Seat # --> Card object
   gameStatus = signal("");
   private prevGameState: GameState | null = null;
   handState: string | null = null;
@@ -34,7 +34,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   // Data relevant to dynamic dropdown
   dropdownData: DropdownData = [0, 0, false];
   private mySeat: number | null = null;
-  selectedPlayerId: string | null = null;
+  selectedPlayerSeat: number | null = null;
 
   public player: Player | null = null;
   private game: GameView | null = null;
@@ -64,11 +64,53 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     this.playerSubscription = this.gameService.player$.subscribe({
       next: (player) => {
         this.player = player;
+        // INFO: 
+        console.log("Player loaded: ", player);
         
         if (this.player?.gameId && this.player.gameId !== 'Not in game') {
-          const playerId = this.player.id;
-    
-          // Get all players data for lobby status
+          this.gameService.getGame().subscribe({
+            next: (gameView) => {
+              if (gameView && gameView.id === this.player?.gameId) {
+                this.game = gameView;
+                // INFO:
+                console.log("Game loaded: ", gameView);
+
+                // Try to retrieve the previous state from localStorage
+                const savedPrevState = localStorage.getItem(`game_${this.game.id}_prevState_${this.player?.id}`);
+
+                if (this.game.cardsInPlay) {
+                  this.cardsInPlay = new Map(Object.entries(this.game.cardsInPlay).map(([key, value]) => [Number(key), value]));
+
+                  if (this.mySeat && this.cardsInPlay.has(this.mySeat)) {
+                    const card : Card | undefined = this.cardsInPlay.get(this.mySeat);
+                    if (card) {
+                      this.selectedCard = card;
+                    }
+                    // If player has forfeited from clash, or clash is concluded, suppress hand component
+
+                  }
+                }
+
+                if (this.game.playerViews) {
+                  this.players = Array.isArray(this.game.playerViews) ? this.game.playerViews : Object.values(this.game.playerViews);
+                  // INFO:
+                  console.log("Fetched all player data in PlaymatComponent: ", this.otherPlayers());
+                }
+
+                if (savedPrevState && Object.values(GameState).includes(savedPrevState as GameState)) {
+                  this.prevGameState = savedPrevState as GameState;
+                  // Update visuals to represent current game state
+                  this.displayStateVisuals(this.prevGameState);
+                }
+                this.updateGameStatus();
+              }
+            },
+            error: (e) => {
+
+            }
+          });
+
+          // Subscribe to WebSocket updates
           this.gameSubscription = this.gameWebSocketService.gameUpdates$.subscribe({
             next: (game) => {
               if (game) {
@@ -77,11 +119,11 @@ export class PlaymatComponent implements OnInit, OnDestroy {
                 const savedPrevState = localStorage.getItem(`game_${game.id}_prevState_${this.player?.id}`);
               
                 if (game.cardsInPlay) {
-                  this.cardsInPlay = new Map(Object.entries(game.cardsInPlay));
+                  this.cardsInPlay = new Map(Object.entries(game.cardsInPlay).map(([key, value]) => [Number(key), value]));
                   // console.log("Obtained all cards in play: ", this.cardsInPlay);
 
-                  if (this.cardsInPlay.has(playerId)) {
-                    const card : Card | undefined = this.cardsInPlay.get(playerId);
+                  if (this.mySeat && this.cardsInPlay.has(this.mySeat)) {
+                    const card : Card | undefined = this.cardsInPlay.get(this.mySeat);
                     if (card) {
                       this.selectedCard = card;
                     }
@@ -89,8 +131,8 @@ export class PlaymatComponent implements OnInit, OnDestroy {
 
                   }
                 }
-                if (game.players) {
-                  this.players = Array.isArray(game.players) ? game.players : Object.values(game.players);
+                if (game.playerViews) {
+                  this.players = Array.isArray(game.playerViews) ? game.playerViews : Object.values(game.playerViews);
                   // console.log("Fetched all player data in PlaymatComponent: ", this.otherPlayers());
                 }
 
@@ -110,13 +152,13 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     });
   }
 
-  thisPlayer(): Player | null {
-    return this.players.find(p => p.id == this.player?.id) ?? null;
+  thisPlayer(): PlayerView | null {
+    return this.players.find(p => p.seat == this.mySeat) ?? null;
   }
 
-  otherPlayers(): Player[] {
+  otherPlayers(): PlayerView[] {
     if (!this.player) return this.players;
-    return this.players.filter(p => p.id !== this.player?.id);
+    return this.players.filter(p => p.seat !== this.mySeat);
   }
 
   updateGameStatus(): void {
@@ -310,75 +352,76 @@ export class PlaymatComponent implements OnInit, OnDestroy {
 
   currentPlayer(): string {
     if (!this.game || !this.game.initiativeMap) return "";
-    const initMap = new Map(Object.entries(this.game.initiativeMap));
-    const curPlayerUUID: string | undefined = initMap.get(this.game.currentInitiativeValue.toString());
+    const initMap : Map<number, number> = new Map(Object.entries(this.game.initiativeMap).map(([key, value]) => [Number(key), value]));
+    const curPlayerSeat: number | undefined = initMap.get(this.game.currentInitiativeValue);
 
-    if (!curPlayerUUID) return "";
+    if (!curPlayerSeat) return "";
     for (const player of this.players) {
-      if (player.id === curPlayerUUID) return player.name;
+      if (player.seat === curPlayerSeat) return player.name;
     }
 
     return "";
   }
 
-  toggleDropdown(event: MouseEvent, playerId: string | undefined): void {
+  toggleDropdown(event: MouseEvent, playerSeat: number | undefined): void {
     // Check if user turn
     if (!this.userTurn) return;
-    if (playerId) {
+    if (playerSeat) {
       // Clicked player to attack
       this.dropdownData = [event.clientX, event.clientY, true];
-      this.selectedPlayerId = playerId;
+      this.selectedPlayerSeat = playerSeat;
     }
     else {
       // Clicked off to remove dropdown
       this.dropdownData = [0, 0, false];
-      this.selectedPlayerId = null;
+      this.selectedPlayerSeat = null;
     }
   }
 
-  attackCard(event: MouseEvent, receivingPlayerId: string): void {
+  attackCard(event: MouseEvent, receivingPlayerSeat: number): void {
     if (!this.player || !this.userTurn) return;
-    this.gameWebSocketService.resolveAction(this.player.id, receivingPlayerId);
+    this.gameWebSocketService.resolveAction(receivingPlayerSeat);
     this.userTurn = false;
     
     // Reset dropdown data
     this.dropdownData = [0, 0, false];
-    this.selectedPlayerId = null;
+    this.selectedPlayerSeat = null;
   }
 
   skipTurn(event: MouseEvent) {
     event.stopPropagation();
     if (!this.player || !this.userTurn) return;
-    this.gameWebSocketService.resolveAction(this.player.id, "null");
+    this.gameWebSocketService.resolveAction(-1);
     this.userTurn = false;
 
     this.dropdownData = [0, 0, false];
-    this.selectedPlayerId = null;
+    this.selectedPlayerSeat = null;
   }
 
   forfeitFromClash(): void {
     if(!this.player || (!this.userTurn && !this.isForfeitButtonPresent())) return;
-    this.gameWebSocketService.playerForfeitClash(this.player.id);
+    this.gameWebSocketService.playerForfeitClash();
     this.userTurn = false;
 
     this.handSuppressed = true;
     this.selectedCard = null;
     this.dropdownData = [0, 0, false];
-    this.selectedPlayerId = null;
+    this.selectedPlayerSeat = null;
   }
 
   interpretClashAction(): string {
-    const resolvedAction: GameAction = this.game?.lastAction!;
+    const resolvedAction: ActionView = this.game?.lastAction!;
     let dealingPlayerName: string = "";
     let receivingPlayerName: string = "";
 
     for (const player of this.players) {
-      if (player.id == resolvedAction.dealingPlayerId) dealingPlayerName = player.name;
-      if (player.id == resolvedAction.receivingPlayerId) receivingPlayerName = player.name;
+      if (player.seat == resolvedAction.dealingSeat) dealingPlayerName = player.name;
+      if (player.seat == resolvedAction.receivingSeat) receivingPlayerName = player.name;
     }
 
-    if (resolvedAction.dealingPlayerId === "null") return `${receivingPlayerName} forfeited from the clash.`
-    if (resolvedAction.receivingPlayerId === "null") return `${dealingPlayerName} skipped their turn.`
+    /** @todo Verify behavior */
+    if (resolvedAction.dealingSeat === null) return `${receivingPlayerName} forfeited from the clash.`
+    if (resolvedAction.receivingSeat === null) return `${dealingPlayerName} skipped their turn.`
     return `${dealingPlayerName} dealt ${resolvedAction.damageDealt} damage to ${receivingPlayerName}!`
   }
 
@@ -393,11 +436,11 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   receivedName(): string {
     if (!this.game) return "";
 
-    const resolvedAction: GameAction = this.game.lastAction!;
+    const resolvedAction: ActionView = this.game.lastAction!;
     let receivingPlayerName: string = "";
 
     for (const player of this.players) {
-      if (player.id == resolvedAction.receivingPlayerId) receivingPlayerName = player.name;
+      if (player.seat == resolvedAction.receivingSeat) receivingPlayerName = player.name;
     }
 
     return receivingPlayerName;
@@ -408,19 +451,19 @@ export class PlaymatComponent implements OnInit, OnDestroy {
     if (!this.game) return "";
     // Last player remaining
     if (this.cardsInPlay.size == 1) {
-      const winnerUUID: string = this.cardsInPlay.keys().next().value!;
+      const winnerSeat: number = this.cardsInPlay.keys().next().value!;
       for (const player of this.players) {
-        if (player.id == winnerUUID) return player.name;
+        if (player.seat == winnerSeat) return player.name;
       }
     }
 
     // Player picked up knockout with Attacker to win clash
 
-    const resolvedAction: GameAction = this.game.lastAction!;
+    const resolvedAction: ActionView = this.game.lastAction!;
     let dealingPlayerName: string = "";
 
     for (const player of this.players) {
-      if (player.id == resolvedAction.dealingPlayerId) dealingPlayerName = player.name;
+      if (player.seat == resolvedAction.dealingSeat) dealingPlayerName = player.name;
     }
 
     return dealingPlayerName;
@@ -430,16 +473,16 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   userKnockout(): boolean {
     if (!this.player || !this.game) return false;
 
-    const resolvedAction: GameAction = this.game.lastAction!;
+    const resolvedAction: ActionView = this.game.lastAction!;
     if (resolvedAction.damageDealt < 0) return false;
-    // User picked up knockout if receivingPlayerId's card in play has 0 hp
-    let receivingCard: Card | undefined = this.cardsInPlay.get(resolvedAction.receivingPlayerId);
+    // User picked up knockout if receivingSeat's card in play has 0 hp
+    let receivingCard: Card | undefined = this.cardsInPlay.get(resolvedAction.receivingSeat!);
     if (receivingCard && receivingCard.curHp > 0) return false;
     
     let dealingPlayerName: string = "";
 
     for (const player of this.players) {
-      if (player.id == resolvedAction.dealingPlayerId) dealingPlayerName = player.name;
+      if (player.seat == resolvedAction.dealingSeat) dealingPlayerName = player.name;
     }
 
     return this.player.name === dealingPlayerName;
@@ -447,7 +490,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
 
   lastPlayer(): boolean {
     if (!this.player || this.cardsInPlay.size > 1) return false
-    return this.cardsInPlay.has(this.player.id);
+    return this.cardsInPlay.has(this.mySeat!);
   }
 
   isForfeitButtonPresent(): boolean {

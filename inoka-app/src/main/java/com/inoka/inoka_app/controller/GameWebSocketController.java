@@ -108,14 +108,24 @@ public class GameWebSocketController {
         }
         
         Game game = gameOpt.get();
-        Optional<String> receivingPlayerIdOpt = game.getPlayerIdBySeat(targetSeat);
+        Optional<String> receivingPlayerIdOpt = Optional.empty();
+        if (targetSeat != -1) game.getPlayerIdBySeat(targetSeat);
         
-        if (receivingPlayerIdOpt.isEmpty()) {
+        // targetSeat == -1: receivingPlayerId = "null"
+        if (receivingPlayerIdOpt.isEmpty() && targetSeat != -1) {
             logger.warn("Invalid target seat: {}", targetSeat);
             return;
         }
         
-        gameService.resolveClashAction(dealingPlayerId, receivingPlayerIdOpt.get());
+        /*
+         *  resolveClashAction() -> dealingPlayer damages receivingPlayer
+         *  if receivingPlayerId == "null", dealingPlayer skips turn
+         */
+        gameService.resolveClashAction(
+            dealingPlayerId,
+            receivingPlayerIdOpt.isPresent() ? receivingPlayerIdOpt.get()
+            : "null"
+        );
     }
 
     @MessageMapping("/gotKnockout")

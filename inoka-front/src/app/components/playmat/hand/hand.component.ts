@@ -61,6 +61,7 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
     this.deckSubscription = this.gameWebSocketService.deckUpdates$
       .subscribe((deck: Card[] | null) => {
         if (deck) this.cards = deck;
+        console.log(deck);
       });
   }
 

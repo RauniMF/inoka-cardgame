@@ -1,5 +1,5 @@
 import { Component, Input } from '@angular/core';
-import { Player } from '../../player';
+import { PlayerView } from '../../game';
 
 @Component({
   selector: 'app-player-entry',
@@ -8,5 +8,5 @@ import { Player } from '../../player';
   styleUrl: './player-entry.component.css'
 })
 export class PlayerEntryComponent {
-  @Input() player!: Player;
+  @Input() player!: PlayerView;
 }

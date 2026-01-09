@@ -173,7 +173,7 @@ public class GameController {
     }
 
     @GetMapping("/game/find")
-    public ResponseEntity<GameView> findGameByGameId(@AuthenticationPrincipal PlayerPrincipal principal) {
+    public ResponseEntity<GameView> findGame(@AuthenticationPrincipal PlayerPrincipal principal) {
         if (principal == null) {
             return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }

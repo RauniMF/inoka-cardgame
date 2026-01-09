@@ -30,12 +30,10 @@
      - Refactor WebSocket Game objects to obfuscate sensitive player information like UUID
           - Figure out how to properly identify users via custom IDs in Game object, as well has how to identify the user's Player object in the array using thisPlayer() method in playmat
           - Modify Game object to assign pseudo-IDs when adding Player objects to the game
+          - Modify Game/GameView to assign players with empty usernames name = 'Player {player.seat}' to identify players who didn't assign themselves a username
           - **Implement planned changes**
-               - Update SchedulerService, GameController & GameWebSocketController to broadcast GameViews and user-specific decks
-               - Front-end model changes (implement DTOs)
-               - Update game.service.ts and game-websocket.service.ts to utilize new DTOs
-               - Update Hand component to utilize new deckSubscription observable provided by the websocket
-               - Modify Playmat component to utilize new DTO to identify players in the view and when sending player action to back-end
+               - Update Playmat component to utilize new DTO to identify players in the view and when sending player action to back-end
+               - Resolve player actions using new seating identification
 
 > Implement front end
 - Get page setup for basic implementation

@@ -47,7 +47,8 @@ export class GameWebSocketService {
             // Subscribe to game updates
             this.stompClient.subscribe(`/topic/game/${gameId}`, (message: IMessage) => {
                 const updatedGame: GameView = JSON.parse(message.body);
-                // console.log('Parsed game object from websocket:', updatedGame);
+                // INFO:
+                console.log('Parsed game object from websocket:', updatedGame);
                 this.gameSubject.next(updatedGame);
             });
 
