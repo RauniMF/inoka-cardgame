@@ -6,7 +6,7 @@ import { GameService } from '../../services/game.service';
 import { Subscription } from 'rxjs';
 import { Player } from '../player';
 import { CommonModule } from '@angular/common';
-import { Game, GameState } from '../game';
+import { Game, GameState, GameView } from '../game';
 import { GameWebSocketService } from '../../services/game-websocket.service';
 import { GameAction } from '../gameAction';
 
@@ -33,10 +33,11 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   userTurn = false;
   // Data relevant to dynamic dropdown
   dropdownData: DropdownData = [0, 0, false];
+  private mySeat: number | null = null;
   selectedPlayerId: string | null = null;
 
   public player: Player | null = null;
-  private game: Game | null = null;
+  private game: GameView | null = null;
   private playerSubscription: Subscription | null = null;
   private gameSubscription: Subscription | null = null;
   
@@ -44,8 +45,15 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   private gameWebSocketService = inject(GameWebSocketService);
 
   ngOnInit(): void {
-    this.fetchCardsInPlay();
+    this.gameService.getPlayerSeat().subscribe({
+      next: (seat) => {
+        this.mySeat = seat;
+        this.fetchCardsInPlay();
+      },
+      error: (e) => console.error("Error initializing game in playmat component: ", e)
+    })
   }
+
   ngOnDestroy(): void {
     this.playerSubscription?.unsubscribe();
     this.gameSubscription?.unsubscribe();
@@ -61,7 +69,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
           const playerId = this.player.id;
     
           // Get all players data for lobby status
-          this.gameSubscription = this.gameService.game$.subscribe({
+          this.gameSubscription = this.gameWebSocketService.gameUpdates$.subscribe({
             next: (game) => {
               if (game) {
                 this.game = game;
@@ -182,7 +190,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
           if (this.userKnockout()) {
             // Receive totem & regain 1d12 hit points
             // console.log("Reached 'picked up knockout'!");
-            this.gameWebSocketService.pickedUpKnockout(this.player?.id!);
+            this.gameWebSocketService.pickedUpKnockout();
           }
         }
         else {
@@ -253,7 +261,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         }
         if (this.userKnockout() && !this.selectedCard?.hasTotem) {
           // Receive totem & regain 1d12 hit points
-          this.gameWebSocketService.pickedUpKnockout(this.player?.id!);
+          this.gameWebSocketService.pickedUpKnockout();
         }
         break;
       case GameState.CLASH_PLAYER_REPLACING_CARD:

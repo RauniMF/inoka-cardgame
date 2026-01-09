@@ -33,7 +33,7 @@ export interface Game {
 
 export interface GameView {
     id: string;
-    state: string;
+    state: GameState;
     players: { [seat: number]: PlayerView };
     cardsInPlay: { [seat: number]: Card };
     addSubDice: number;

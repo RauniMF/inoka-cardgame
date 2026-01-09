@@ -42,7 +42,7 @@ export class QueueComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.gameService.createGame(this.player.id, passcode)
+    this.gameService.createGame(passcode)
   }
 
 }

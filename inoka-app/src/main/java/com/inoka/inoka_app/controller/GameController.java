@@ -281,4 +281,25 @@ public class GameController {
         if (result) return new ResponseEntity<>(HttpStatus.OK);
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
+
+    @GetMapping("/player/seat")
+    public ResponseEntity<Integer> getPlayerSeat(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
+        Player player = principal.getPlayer();
+
+        Optional<Game> gameOpt = gameService.getGameByPlayerId(player.getId());
+        if (gameOpt.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        int seat = gameOpt.get().getSeatForPlayer(player.getId());
+        if (seat == -1) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        return ResponseEntity.ok(seat);
+    }
 }

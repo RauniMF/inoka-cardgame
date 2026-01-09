@@ -5,6 +5,8 @@ import { Observable, Subscription } from 'rxjs';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { PlayerEntryComponent } from './player-entry/player-entry.component';
+import { GameWebSocketService } from '../../services/game-websocket.service';
+import { GameView, PlayerView } from '../game';
 
 @Component({
   selector: 'app-lobby-main',
@@ -16,9 +18,10 @@ import { PlayerEntryComponent } from './player-entry/player-entry.component';
 export class LobbyMainComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private gameService = inject(GameService);
+  private gameWebSocketService = inject(GameWebSocketService);
   
   public player: Player | null = null;
-  players: Player[] = [];
+  players: PlayerView[] = [];
   lobbyStatus = signal("Waiting for players");
   private playerSubscription: Subscription | null = null;
   private gameSubscription: Subscription | null = null;
@@ -45,7 +48,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
           const gameId = this.player.gameId;
     
           // Get all players data for lobby status
-          this.gameSubscription = this.gameService.game$.subscribe({
+          this.gameSubscription = this.gameWebSocketService.gameUpdates$.subscribe({
             next: (gameUpdate) => {
               if (gameUpdate) {
                 this.players = Array.isArray(gameUpdate.players) ? gameUpdate.players : Object.values(gameUpdate.players);
@@ -81,7 +84,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
       this.gameService.allPlayersReady(gameId).subscribe({
         next: (r) => {
           const allReady = r;
-          if (allReady && this.startingFlag) this.startGameCooldown();
+          if (allReady && this.startingFlag) this.startGameCooldown(gameId);
           else this.lobbyStatus.set("Waiting for all players to be ready...");
         },
         error: (e) => console.error(`Game id:${gameId} error returning player ready status: `, e)
@@ -111,7 +114,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
     }
   }
   
-  startGameCooldown(): void {
+  startGameCooldown(gameId: string): void {
     let count = 5;
     this.lobbyStatus.set(`Game starting in: ${count}`);
     this.startingFlag = false;
@@ -124,7 +127,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
         clearInterval(interval);
         // Navigate to game page
         this.lobbyStatus.set("Game starting...");
-        this.gameService.startGame().subscribe({
+        this.gameService.startGame(gameId).subscribe({
           next: () => {
             console.log("Game starting.");
             this.router.navigate(["/game"]);

@@ -3,7 +3,7 @@ import { Injectable } from "@angular/core";
 import { BehaviorSubject, Observable } from "rxjs"
 import { Player } from "../components/player";
 import { Card } from "../components/card";
-import { Game } from "../components/game";
+import { Game, GameView } from "../components/game";
 import { GameWebSocketService } from "./game-websocket.service";
 
 @Injectable({
@@ -11,27 +11,15 @@ import { GameWebSocketService } from "./game-websocket.service";
 })
 export class GameService {
     private apiServerUrl = 'http://localhost:8080/inoka';
+    private currentGameId: string | null = null;
 
     // BehaviorSubject holds player's data
     private playerSubject = new BehaviorSubject<Player | null>(null);
     public player$ = this.playerSubject.asObservable();
 
-    // Game data if player is in game
-    private gameSubject = new BehaviorSubject<Game | null>(null);
-    public game$ = this.gameSubject.asObservable();
-
     constructor(private http: HttpClient, private gameWebSocketService: GameWebSocketService) {
         // Initialize player data when service starts
-        console.log("Page loaded");
         this.loadPlayer();
-
-        this.gameWebSocketService.gameUpdates$.subscribe((updatedGame: Game | null) => {
-            if (updatedGame) {
-                // INFO: 
-                console.log("Game update received via WebSocket: ", updatedGame);
-                this.gameSubject.next(updatedGame);
-            }
-        });
     }
 
     /*
@@ -43,14 +31,12 @@ export class GameService {
         
         if (storedUUID && storedToken) {
             // Find player with ID in back-end (token will be sent via interceptor)
-            this.findPlayer(storedUUID).subscribe({
+            this.findPlayer()
+            .subscribe({
                 next: (p) => {
                     this.playerSubject.next(p);
                     console.log("Player loaded from existing session");
-                    if(this.playerSubject.value != undefined &&
-                        this.playerSubject.value.gameId != null &&
-                        this.playerSubject.value.gameId != "Not in game")
-                        this.loadGame(this.playerSubject.value.gameId);
+                    this.handleWS(p);
                 },
                 // If findPlayer fails, handle gracefully
                 error: (e) => {
@@ -70,9 +56,7 @@ export class GameService {
                     localStorage.setItem('authToken', response.token);
                     this.playerSubject.next(response.player);
                     // console.log("Token refreshed for existing player");
-                    if(response.player.gameId != null && response.player.gameId != "Not in game") {
-                        this.loadGame(response.player.gameId);
-                    }
+                    this.handleWS(response.player);
                 },
                 error: (e) => {
                     // Player UUID doesn't exist in database, or refresh failed
@@ -107,26 +91,36 @@ export class GameService {
         });
     }
 
-    // Fetch game details to update gameSubject
-    private loadGame(gameId: string): void {
-        this.http.get<Game>(`${this.apiServerUrl}/game/find`).subscribe({
-            next: (game) => {
-                this.gameSubject.next(game);
-                this.gameWebSocketService.connect(game.id);
-            },
-            error: (e) => console.error("Could not load game: ", e)
-        })
+    // Handle WebSocket connection from player updates
+    private handleWS(player: Player): void {
+        if (player.gameId && player.gameId !== 'Not in game') {
+            // Player in game = establish connection
+            if (this.currentGameId !== player.gameId) {
+                this.currentGameId = player.gameId;
+                this.gameWebSocketService.connect(player.gameId);
+                // INFO:
+                console.log("WebSocket connection opened.");
+            }
+        }
+        else {
+            // Player not in game = disconnect
+            if (this.currentGameId !== null) {
+                this.gameWebSocketService.disconnect();
+                this.currentGameId = null;
+                // INFO:
+                console.log("WebSocket disconnected.")
+            }
+        }
     }
 
-    /*
-     * Api communication with back-end
-    */
+    /** @deprecated Endpoint disabled */
     public getAllPlayers(): Observable<Player[]> {
         return this.http.get<Player[]>(`${this.apiServerUrl}/player/all`);
     }
 
-    public findPlayer(id: string): Observable<Player> {
-        return this.http.get<Player>(`${this.apiServerUrl}/player/find?id=${id}`);
+    // Player lookup via principal
+    public findPlayer(): Observable<Player> {
+        return this.http.get<Player>(`${this.apiServerUrl}/player/find`);
     }
 
     public addPlayer(player: Player): Observable<{ player: Player, token: string }> {
@@ -141,11 +135,15 @@ export class GameService {
     public updatePlayer(name: string): void {
         const currentPlayer = this.playerSubject.value;
         if (currentPlayer && currentPlayer.id) {
-            this.http.put<void>(`${this.apiServerUrl}/player/update?name=${name}`, currentPlayer.id).subscribe({
+            this.http.put<void>(
+                `${this.apiServerUrl}/player/update?name=${encodeURIComponent(name)}`,
+                null
+            ).subscribe({
                 next: (r) => {
                     currentPlayer.name = name;
                     this.playerSubject.next(currentPlayer);
-                    console.log('PUT request success: ', r);
+                    // INFO:
+                    //console.log('PUT request success: ', r);
                 },
                 error: (e) => console.error("Failed to update player: ", e)
             });
@@ -153,7 +151,7 @@ export class GameService {
     }
 
     // Player joins game and updates BehaviorSubject
-    public createGame(playerId: string, passcode: string = ""): void {
+    public createGame(passcode: string = ""): void {
         const currentPlayer = this.playerSubject.value;
         if (currentPlayer && currentPlayer.id) {
             let httpObservable: Observable<string>;
@@ -167,34 +165,33 @@ export class GameService {
                 next: (gameId) => {
                     currentPlayer.gameId = gameId;
                     this.playerSubject.next(currentPlayer);
-                    console.log('POST request success: Joined game with id=', gameId);
-                    this.loadGame(gameId);
+                    // INFO:
+                    // console.log('Joined game with id=', gameId);
+                    this.handleWS(currentPlayer);
                 },
                 error: (e) => console.error("Failed to create game: ", e)
             });
         }
     }
 
-    public removePlayer(id: string): Observable<void> {
-        return this.http.delete<void>(`${this.apiServerUrl}/player/remove?id=${id}`);
+    public removePlayer(): Observable<void> {
+        return this.http.delete<void>(`${this.apiServerUrl}/player/remove`);
     }
 
+    /** @deprecated Endpoint disabled */
     public removeAllPlayers(): Observable<void> {
         return this.http.delete<void>(`${this.apiServerUrl}/player/remove/all`);
     }
 
-    public getPlayerDeck(playerId: string): Observable<Card[]> {
-        return this.http.get<Card[]>(`${this.apiServerUrl}/player/card/all?playerId=${playerId}`);
-    }
-
-    public joinGame(playerId: string, passcode: string): Observable<string> {
-        return this.http.put<string>(`${this.apiServerUrl}/game/join?passcode=${passcode}`, playerId);
+    public getPlayerDeck(): Observable<Card[]> {
+        return this.http.get<Card[]>(`${this.apiServerUrl}/player/card/all`);
     }
 
     public getPlayersInLobby(gameId: string): Observable<Player[]> {
         return this.http.get<Player[]>(`${this.apiServerUrl}/game/players?id=${gameId}`);
     }
 
+    /** @todo Update with backend changes */
     public setPlayerReady(playerId: string): Observable<string> {
         const headers = new HttpHeaders().set('Content-Type', 'text/plain');
         return this.http.put(`${this.apiServerUrl}/player/ready`, playerId, { headers, responseType: 'text' as 'json' }) as Observable<string>;
@@ -204,32 +201,33 @@ export class GameService {
         return this.http.get<Boolean>(`${this.apiServerUrl}/game/ready?id=${gameId}`);
     }
 
-    public startGame(): Observable<void> {
-        const gameId = this.gameSubject.value?.id;
+    public startGame(gameId: string): Observable<void> {
         return this.http.put<void>(`${this.apiServerUrl}/game/start`, gameId);
     }
 
-    public startClash(): void {
-        const gameId = this.gameSubject.value?.id;
+    /** @ignore Clash start handled by websocket service */
+    public startClash(gameId: string): void {
         this.http.put<void>(`${this.apiServerUrl}/game/clash/start`, gameId).subscribe({
             next: () => {},
             // error: (e) => console.log(e)
         });
     }
 
-    public clashProcessed(): void {
+    /** @ignore Clash processing handled by websocket service */
+    public clashProcessed(gameId: string): void {
         const headers = new HttpHeaders().set('Content-Type', 'text/plain');
-        const gameId = this.gameSubject.value?.id;
         this.http.put<void>(`${this.apiServerUrl}/game/clash/processed`, gameId, { headers, responseType: 'text' as 'json' }).subscribe({
             next: () => {},
             // error: (e) => console.log(e)
         });
     }
 
+    /** @todo Update with backend changes */
     public rollInitForPlayer(playerId: string): Observable<number> {
         return this.http.get<number>(`${this.apiServerUrl}/player/rollinit?id=${playerId}`)
     }
 
+    /** @todo Update with backend changes */
     public removeCardInPlay(playerId: string): void {
         this.http.delete<void>(`${this.apiServerUrl}/player/cardInPlay?id=${playerId}`).subscribe({
             next: () => {},
@@ -237,11 +235,16 @@ export class GameService {
         });
     }
 
+    /** @todo Update with backend changes */
     public playerWonClash(playerId: string): void{
         const headers = new HttpHeaders().set('Content-Type', 'text/plain');
         this.http.put<void>(`${this.apiServerUrl}/player/wonClash`, playerId, { headers }).subscribe({
             next: () => {},
             error: (e) => console.log("Error checking if player won: ", e)
         });
+    }
+
+    public getPlayerSeat(): Observable<number> {
+        return this.http.get<number>(`${this.apiServerUrl}/player/seat`);
     }
 }
