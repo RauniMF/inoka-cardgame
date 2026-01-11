@@ -109,7 +109,7 @@ public class GameWebSocketController {
         
         Game game = gameOpt.get();
         Optional<String> receivingPlayerIdOpt = Optional.empty();
-        if (targetSeat != -1) game.getPlayerIdBySeat(targetSeat);
+        if (targetSeat != -1) receivingPlayerIdOpt = game.getPlayerIdBySeat(targetSeat);
         
         // targetSeat == -1: receivingPlayerId = "null"
         if (receivingPlayerIdOpt.isEmpty() && targetSeat != -1) {

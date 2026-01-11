@@ -30,10 +30,7 @@
      - Refactor WebSocket Game objects to obfuscate sensitive player information like UUID
           - Figure out how to properly identify users via custom IDs in Game object, as well has how to identify the user's Player object in the array using thisPlayer() method in playmat
           - Modify Game object to assign pseudo-IDs when adding Player objects to the game
-          - Modify Game/GameView to assign players with empty usernames name = 'Player {player.seat}' to identify players who didn't assign themselves a username
-          - **Implement planned changes**
-               - Update Playmat component to utilize new DTO to identify players in the view and when sending player action to back-end
-               - Resolve player actions using new seating identification
+          - Modify Game/GameView to assign players with empty usernames name = 'Player {player.seat}' to identify players who didn't assign themselves a username (DONE)
 
 > Implement front end
 - Get page setup for basic implementation

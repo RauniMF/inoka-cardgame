@@ -46,7 +46,7 @@ export interface GameView {
 export interface PlayerView {
     seat: number;
     name: string;
-    isReady: boolean;
+    ready: boolean;
     deckSize: number;
     sacredStones: number;
     initiative: number;

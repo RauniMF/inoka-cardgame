@@ -13,6 +13,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
+import com.inoka.inoka_app.model.GameView;
 import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.repositories.PlayerRepository;
 
@@ -49,12 +50,12 @@ public class GameServiceTest {
         gameService.createGame("123", new Player("Player Five"));
         Game testOne = gameService.createGame("123", new Player("Player Six"));
 
-        Assertions.assertTrue(testOne.numPlayers() == 6);
+        Assertions.assertEquals(testOne.numPlayers(), 6);
         
         // Attempt to join lobby with same passcode
         Game testTwo = gameService.createGame("123", new Player("Player Seven"));
 
-        Assertions.assertTrue(testTwo.numPlayers() == 1);
+        Assertions.assertEquals(testTwo.numPlayers(), 1);
     }
 
     @Test
@@ -88,7 +89,7 @@ public class GameServiceTest {
         when(playerService.findPlayerById(pFive.getId())).thenReturn(Optional.of(pFive));
         when(playerService.findPlayerById(pSix.getId())).thenReturn(Optional.of(pSix));
 
-        Assertions.assertTrue(testGame.getState() == GameState.WAITING_FOR_PLAYERS);
+        Assertions.assertEquals(testGame.getState(), GameState.WAITING_FOR_PLAYERS);
 
         gameService.createGame("readyTest", pTwo);
         gameService.createGame("readyTest", pThree);
@@ -97,7 +98,7 @@ public class GameServiceTest {
         gameService.createGame("readyTest", pSix);
         
         // Asserts all players have been added to testGame object
-        Assertions.assertTrue(testGame.numPlayers() == 6);
+        Assertions.assertEquals(testGame.numPlayers(), 6);
 
         // Players aren't ready yet
         Assertions.assertTrue(gameService.allPlayersReady(testGame.getId()).isPresent());
@@ -136,7 +137,7 @@ public class GameServiceTest {
         Player pOne = new Player("Player One");
         Player pTwo = new Player("Player Two");
 
-        Game testGame = gameService.createGame("readyTest", pOne);
+        Game testGame = gameService.createGame("cardTest", pOne);
         
         pOne.setGameId(testGame.getId());
         pTwo.setGameId(testGame.getId());
@@ -144,11 +145,11 @@ public class GameServiceTest {
         when(playerService.findPlayerById(pOne.getId())).thenReturn(Optional.of(pOne));
         when(playerService.findPlayerById(pTwo.getId())).thenReturn(Optional.of(pTwo));
 
-        Assertions.assertTrue(testGame.getState() == GameState.WAITING_FOR_PLAYERS);
+        Assertions.assertEquals(testGame.getState(), GameState.WAITING_FOR_PLAYERS);
 
-        gameService.createGame("readyTest", pTwo);
+        gameService.createGame("cardTest", pTwo);
 
-        Assertions.assertTrue(testGame.numPlayers() == 2);
+        Assertions.assertEquals(testGame.numPlayers(), 2);
 
         // Players aren't ready yet
         Assertions.assertTrue(gameService.allPlayersReady(testGame.getId()).isPresent());
@@ -160,10 +161,10 @@ public class GameServiceTest {
         // Front-end calls startGame()
         Assertions.assertTrue(gameService.setGameStart(testGame.getId()));
         // No cards in play
-        Assertions.assertTrue(gameService.getGameById(testGame.getId()).get().getCardsInPlay().size() == 0);
+        Assertions.assertEquals(gameService.getGameById(testGame.getId()).get().getCardsInPlay().size(), 0);
 
         // When in game, players receive their hand via the fetchCard() method in the HandComponent
-        Assertions.assertTrue(gameService.getPlayerDeck(pOne.getId()).get().size() == 9);
+        Assertions.assertEquals(gameService.getPlayerDeck(pOne.getId()).get().size(), 9);
 
         Card cardToPlay = pOne.getDeck().get(0);
 
@@ -172,5 +173,110 @@ public class GameServiceTest {
 
         // Verify card has been put in play
         Assertions.assertTrue(gameService.getGameById(testGame.getId()).get().getCardsInPlay().size() > 0);
+    }
+
+    @Test
+    public void seatSelectionTest() {
+        /*
+         *  Verifies functionality of target selection via seat number,
+         *  As well as resolveClashAction() method.
+         */
+
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+
+        Game testGame = gameService.createGame("seatTest", pOne);
+        
+        pOne.setGameId(testGame.getId());
+        pTwo.setGameId(testGame.getId());
+
+        when(playerService.findPlayerById(pOne.getId())).thenReturn(Optional.of(pOne));
+        when(playerService.findPlayerById(pTwo.getId())).thenReturn(Optional.of(pTwo));
+
+        Assertions.assertEquals(testGame.getState(), GameState.WAITING_FOR_PLAYERS);
+
+        gameService.createGame("seatTest", pTwo);
+
+        Assertions.assertEquals(testGame.numPlayers(), 2);
+
+        gameService.setPlayerReady(pOne.getId());
+        gameService.setPlayerReady(pTwo.getId());
+
+        Assertions.assertTrue(gameService.setGameStart(testGame.getId()));
+
+        Assertions.assertTrue(gameService.putCardInPlay(pOne.getId(), pOne.getDeck().get(0)));
+        Assertions.assertTrue(gameService.putCardInPlay(pTwo.getId(), pTwo.getDeck().get(0)));
+
+        Assertions.assertEquals(gameService.getGameById(testGame.getId()).get().getCardsInPlay().size(), 2);
+
+        // Start Clash
+        Assertions.assertTrue(gameService.setClashStart(testGame.getId()));
+
+        // Roll for initiative
+        Assertions.assertEquals(testGame.getState(), GameState.CLASH_ROLL_INIT);
+
+        int pOneInit = gameService.rollInitForPlayer(pOne.getId());
+
+        // Not all players have rolled yet
+        Assertions.assertEquals(testGame.getState(), GameState.CLASH_ROLL_INIT);
+
+        int pTwoInit = gameService.rollInitForPlayer(pTwo.getId());
+
+        Assertions.assertEquals(testGame.getState(), GameState.CLASH_PLAYER_TURN);
+    
+        Assertions.assertTrue(
+            testGame.getCurrentInitiativeValue() == pOneInit ||
+            testGame.getCurrentInitiativeValue() == pTwoInit
+        );
+
+        String dealingId = "";
+        String receivingId = "";
+        // One player attacks another
+        if (testGame.getCurrentInitiativeValue() == pOneInit) {
+            dealingId = pOne.getId();
+            receivingId = pTwo.getId();
+        }
+        else {
+            dealingId = pTwo.getId();
+            receivingId = pOne.getId();
+        }
+
+        // First, check seat number assignment worked
+        Assertions.assertEquals(testGame.getSeatForPlayer(pOne.getId()), 1);
+        Assertions.assertEquals(testGame.getSeatForPlayer(pTwo.getId()), 2);
+
+        // Then get playerIdBySeat()
+        // This mimics what's done by handleClashAction() in GameWebSocketController
+        Assertions.assertEquals(
+            gameService.getGameByPlayerId(pOne.getId()).get(),
+            testGame
+        );
+        
+        Assertions.assertEquals(
+            gameService.getGameByPlayerId(pOne.getId()).get()
+                .getPlayerIdBySeat(1).get(),
+            pOne.getId()
+        );
+
+        Assertions.assertTrue(gameService.resolveClashAction(dealingId, receivingId) > 0);
+    }
+
+    @Test
+    public void emptyPlayerNameTest() {
+        /*
+         *  Verifies GameView successfully assigns users with no username
+         *  a `Player{player.seat}` identifier
+         */
+
+        Player pOne = new Player("");
+
+        Game testGame = gameService.createGame("nameTest", pOne);
+        
+        pOne.setGameId(testGame.getId());
+
+        GameView testGameView = GameView.fromGame(testGame);
+
+        Assertions.assertEquals(testGameView.getPlayerViews().size(), 1);
+        Assertions.assertEquals(testGameView.getPlayerViews().get(1).getName(), "Player 1");
     }
 }

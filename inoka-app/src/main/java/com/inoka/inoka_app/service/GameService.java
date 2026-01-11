@@ -239,6 +239,7 @@ public class GameService {
                         game.setState(GameState.CLASH_ROLL_INIT);
                         // Initiative values are re-rolled at start of clash
                         game.resetInitiativeValue();
+                        game.clearInitiativeMap();
                         result.set(0, true);
                         this.publishGameUpdate(gameId);
                     }

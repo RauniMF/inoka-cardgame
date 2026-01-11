@@ -143,6 +143,9 @@ public class Game {
     public Map<Integer, String> getInitiativeMap() {
         return initiativeMap;
     }
+    public void clearInitiativeMap() {
+        this.initiativeMap.clear();
+    }
     /*
      * Given a player,
      * If their initiative value is not in the map, add it and return true

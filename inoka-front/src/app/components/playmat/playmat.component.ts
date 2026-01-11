@@ -8,7 +8,6 @@ import { Player } from '../player';
 import { CommonModule } from '@angular/common';
 import { ActionView, Game, GameState, GameView, PlayerView } from '../game';
 import { GameWebSocketService } from '../../services/game-websocket.service';
-import { GameAction } from '../gameAction';
 
 type DropdownData = [number, number, boolean];
 
@@ -65,7 +64,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
       next: (player) => {
         this.player = player;
         // INFO: 
-        console.log("Player loaded: ", player);
+        // console.log("Player loaded: ", player);
         
         if (this.player?.gameId && this.player.gameId !== 'Not in game') {
           this.gameService.getGame().subscribe({
@@ -73,7 +72,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
               if (gameView && gameView.id === this.player?.gameId) {
                 this.game = gameView;
                 // INFO:
-                console.log("Game loaded: ", gameView);
+                // console.log("Game loaded: ", gameView);
 
                 // Try to retrieve the previous state from localStorage
                 const savedPrevState = localStorage.getItem(`game_${this.game.id}_prevState_${this.player?.id}`);
@@ -94,7 +93,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
                 if (this.game.playerViews) {
                   this.players = Array.isArray(this.game.playerViews) ? this.game.playerViews : Object.values(this.game.playerViews);
                   // INFO:
-                  console.log("Fetched all player data in PlaymatComponent: ", this.otherPlayers());
+                  // console.log("Fetched all player data in PlaymatComponent: ", this.otherPlayers());
                 }
 
                 if (savedPrevState && Object.values(GameState).includes(savedPrevState as GameState)) {
@@ -106,7 +105,12 @@ export class PlaymatComponent implements OnInit, OnDestroy {
               }
             },
             error: (e) => {
-
+              if (e.status === 404) {
+                console.log("Player not in game.");
+              }
+              else {
+                console.log("Error fetching Game details: ", e);
+              }
             }
           });
 
@@ -208,7 +212,8 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         await new Promise(resolve => setTimeout(resolve, 3000));
         // If user is last player standing, they win
         if (this.lastPlayer()) {
-          console.log("Last player check reached.");
+          // INFO:
+          // console.log("Last player check reached.");
           this.gameService.playerWonClash(this.player?.id!);
         }
         else {
@@ -216,7 +221,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         }
         break;
       case GameState.CLASH_PROCESSING_DECISION:
-        //console.log("State reached: Clash Processing Decision.")
+        // console.log("State reached: Clash Processing Decision.")
         this.userTurn = false;
         // Show choice taken / damage dealt
         this.gameStatus.set(this.interpretClashAction());

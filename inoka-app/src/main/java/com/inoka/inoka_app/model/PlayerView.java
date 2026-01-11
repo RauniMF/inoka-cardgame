@@ -12,7 +12,10 @@ public class PlayerView {
     public static PlayerView fromPlayer(Player player, int seat) {
         PlayerView view = new PlayerView();
         view.setSeat(seat);
-        view.setName(player.getName());
+        // Empty name --> `Player {seat}`
+        if (player.getName() == null || player.getName().isBlank()) {
+            view.setName(String.format("Player %d", seat));
+        } else { view.setName(player.getName()); }
         view.setReady(player.isReady());
         view.setDeckSize(player.getDeckSize());
         view.setSacredStones(player.getSacredStones());

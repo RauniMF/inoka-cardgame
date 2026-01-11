@@ -30,6 +30,7 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
   private deckSubscription: Subscription | null = null;
 
   private gameWebSocketService = inject(GameWebSocketService);
+  private gameService = inject(GameService);
 
   ngOnInit(): void {
     this.fetchCards();
@@ -41,6 +42,7 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    setTimeout(() => {
       if (this.suppressChoosing || (changes['existingCard'] && changes['existingCard'].currentValue)) {
         this.updateState('stowed');
       }
@@ -50,18 +52,32 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
       ){
         this.updateState('choosing');
       }
+    });
   }
 
   updateState(state: HandState): void {
     this.handState.set(state);
+    // INFO: 
+    // console.log("Hand state: ", state);
     this.handStateEmitter.emit(state);
   }
 
   fetchCards(): void {
+    this.gameService.getPlayerDeck().subscribe({
+      next: (deck) => {
+        if (deck) this.cards = deck;
+      },
+      error: (e) => {
+        console.log("Error fetching cards: ", e);
+      }
+    });
+
+    // Subscribe to WebSocket updates
     this.deckSubscription = this.gameWebSocketService.deckUpdates$
       .subscribe((deck: Card[] | null) => {
         if (deck) this.cards = deck;
-        console.log(deck);
+        // INFO:
+        console.log("Fetched deck from WebSocket: ", deck);
       });
   }
 
@@ -70,7 +86,7 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   onSelectCard(card: Card, index: number): void {
-    if(this.handState() === 'choosing' && this.player) {
+    if(this.handState() === 'choosing') {
       this.selectedCard.set(card);
       this.selectedCardEmitter.emit(card);
       this.cards.splice(index, 1);
