@@ -7,6 +7,7 @@ import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameView;
 import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.model.PlayerEntry;
+import com.inoka.inoka_app.model.PlayerView;
 import com.inoka.inoka_app.security.JwtUtil;
 import com.inoka.inoka_app.security.PlayerPrincipal;
 import com.inoka.inoka_app.service.GameService;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,14 +99,14 @@ public class GameController {
         }
 
         // Verify player exists in the database
-        Optional<Player> playerOptional = playerService.findPlayerById(playerId);
-        if (playerOptional.isEmpty()) {
+        Optional<Player> playerOpt = playerService.findPlayerById(playerId);
+        if (playerOpt.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
 
         // Generate new JWT token for existing player
         String newToken = jwtUtil.generateToken(playerId);
-        PlayerEntry pEntry = new PlayerEntry(playerOptional.get());
+        PlayerEntry pEntry = new PlayerEntry(playerOpt.get());
 
         Map<String, Object> response = new HashMap<>();
         response.put("player", pEntry);
@@ -179,13 +181,13 @@ public class GameController {
         }
     
         Player player = principal.getPlayer();
-        Optional<Game> game = gameService.getGameById(player.getGameId());
+        Optional<Game> gameOpt = gameService.getGameById(player.getGameId());
         
-        if (game.isEmpty()) {
+        if (gameOpt.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
 
-        GameView gameView = GameView.fromGame(game.get());
+        GameView gameView = GameView.fromGame(gameOpt.get());
         return ResponseEntity.ok(gameView);
     }
     
@@ -196,23 +198,32 @@ public class GameController {
         return ResponseEntity.ok(games);
     }
     
-    // TODO: Update to return DTO obscuring sensitive player data
     @GetMapping("/game/players")
-    public ResponseEntity<List<Player>> getPlayersInGame(@RequestParam String id) {
-        Optional<List<Player>> playersList = gameService.getPlayersInGame(id);
-        if (playersList.isPresent()) {
-            List<Player> players = playersList.get();
-            return ResponseEntity.ok(players);
+    public ResponseEntity<List<PlayerView>> getPlayersInGame(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }
-        else {
+    
+        Player player = principal.getPlayer();
+        Optional<Game> gameOpt = gameService.getGameById(player.getGameId());
+        
+        if (gameOpt.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
+
+        List<PlayerView> result = new ArrayList<>(GameView.fromGame(gameOpt.get()).getPlayerViews().values());
+        return ResponseEntity.ok(result);
     }
 
-    // TODO: Change to accept principal
-    @PutMapping(value = "/player/ready", consumes = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<String> setPlayerReady(@RequestBody String id) {
-        boolean success = gameService.setPlayerReady(id);
+    @PutMapping("/player/ready")
+    public ResponseEntity<String> setPlayerReady(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    
+        Player player = principal.getPlayer();
+
+        boolean success = gameService.setPlayerReady(player.getId());
         if (success) {
             return ResponseEntity.ok("Player readied up.");
         } else {
@@ -250,34 +261,54 @@ public class GameController {
         return ResponseEntity.status(403).body("Unable to set GameState to CLASH_PLAYER_TURN.");
     }
 
-    // TODO: Change to accept principal
     @GetMapping("/player/rollinit")
-    public ResponseEntity<Integer> rollInitiativeForPlayer(@RequestParam String id) {
-        int result = gameService.rollInitForPlayer(id);
+    public ResponseEntity<Integer> rollInitiativeForPlayer(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    
+        Player player = principal.getPlayer();
+
+        int result = gameService.rollInitForPlayer(player.getId());
         if (result == -1) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         return ResponseEntity.ok(result);
     }
 
-    // TODO: Change to accept principal
     @DeleteMapping("/player/cardInPlay")
-    public ResponseEntity<?> removeCardInPlay(@RequestParam String id) {
-        boolean result = gameService.removePlayerCardInPlay(id);
+    public ResponseEntity<?> removeCardInPlay(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    
+        Player player = principal.getPlayer();
+
+        boolean result = gameService.removePlayerCardInPlay(player.getId());
         if (result) return new ResponseEntity<>(HttpStatus.OK);
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
-    // TODO: Change to accept principal
-    @PutMapping(value = "/player/gotKnockout", consumes = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<?> playerPickUpKnockout(@RequestBody String id) {
-        boolean result = gameService.playerPickUpKnockout(id);
+    @PutMapping("/player/gotKnockout")
+    public ResponseEntity<?> playerPickUpKnockout(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    
+        Player player = principal.getPlayer();
+
+        boolean result = gameService.playerPickUpKnockout(player.getId());
         if (result) return new ResponseEntity<>(HttpStatus.OK);
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
-    // TODO: Change to accept principal
-    @PutMapping(value = "/player/wonClash", consumes = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<?> playerWonClash(@RequestBody String id) {
-        boolean result = gameService.playerWonClash(id);
+    @PutMapping("/player/wonClash")
+    public ResponseEntity<?> playerWonClash(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    
+        Player player = principal.getPlayer();
+
+        boolean result = gameService.playerWonClash(player.getId());
         if (result) return new ResponseEntity<>(HttpStatus.OK);
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }

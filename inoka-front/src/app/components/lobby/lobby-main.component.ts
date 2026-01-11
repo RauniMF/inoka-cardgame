@@ -134,7 +134,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
    */
   toggleReady(): void {
     if (this.player?.id) {
-      this.gameService.setPlayerReady(this.player.id).subscribe({
+      this.gameService.setPlayerReady().subscribe({
         next: (r) => {
           this.updateLobbyStatus();
         },

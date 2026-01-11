@@ -196,10 +196,8 @@ export class GameService {
         return this.http.get<Player[]>(`${this.apiServerUrl}/game/players?id=${gameId}`);
     }
 
-    /** @todo Update with backend changes */
-    public setPlayerReady(playerId: string): Observable<string> {
-        const headers = new HttpHeaders().set('Content-Type', 'text/plain');
-        return this.http.put(`${this.apiServerUrl}/player/ready`, playerId, { headers, responseType: 'text' as 'json' }) as Observable<string>;
+    public setPlayerReady(): Observable<string> {
+        return this.http.put<string>(`${this.apiServerUrl}/player/ready`, null);
     }
 
     public allPlayersReady(gameId: string): Observable<Boolean> {
@@ -227,23 +225,19 @@ export class GameService {
         });
     }
 
-    /** @todo Update with backend changes */
-    public rollInitForPlayer(playerId: string): Observable<number> {
-        return this.http.get<number>(`${this.apiServerUrl}/player/rollinit?id=${playerId}`)
+    public rollInitForPlayer(): Observable<number> {
+        return this.http.get<number>(`${this.apiServerUrl}/player/rollinit`)
     }
 
-    /** @todo Update with backend changes */
-    public removeCardInPlay(playerId: string): void {
-        this.http.delete<void>(`${this.apiServerUrl}/player/cardInPlay?id=${playerId}`).subscribe({
+    public removeCardInPlay(): void {
+        this.http.delete<void>(`${this.apiServerUrl}/player/cardInPlay`).subscribe({
             next: () => {},
             error: (e) => console.log("Error removing card in play: ", e)
         });
     }
 
-    /** @todo Update with backend changes */
-    public playerWonClash(playerId: string): void{
-        const headers = new HttpHeaders().set('Content-Type', 'text/plain');
-        this.http.put<void>(`${this.apiServerUrl}/player/wonClash`, playerId, { headers }).subscribe({
+    public playerWonClash(): void{
+        this.http.put<void>(`${this.apiServerUrl}/player/wonClash`, null).subscribe({
             next: () => {},
             error: (e) => console.log("Error checking if player won: ", e)
         });

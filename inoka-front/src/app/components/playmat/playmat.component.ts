@@ -196,7 +196,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         //console.log("State reached: Clash Roll Initiative.")
         this.cardsNotRevealed = false;
         this.gameStatus.set("Rolling for initiative.");
-        this.gameService.rollInitForPlayer(this.player?.id!).subscribe({
+        this.gameService.rollInitForPlayer().subscribe({
           next: (roll) => {
             this.gameStatus.set(`Rolled a ${roll} for initiative.`);
             // Add roll to local storage
@@ -214,7 +214,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         if (this.lastPlayer()) {
           // INFO:
           // console.log("Last player check reached.");
-          this.gameService.playerWonClash(this.player?.id!);
+          this.gameService.playerWonClash();
         }
         else {
           this.displayStateVisuals(state);
@@ -231,7 +231,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
           // If card was taken out - remove card & let player make choice
           if (this.selectedCard?.curHp! <= 0) {
             // Remove card from play
-            this.gameService.removeCardInPlay(this.player?.id!);
+            this.gameService.removeCardInPlay();
           }
           // If player took a knockout, 
           if (this.userKnockout()) {
@@ -304,7 +304,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         // If player card was lost, remove it
         if (this.selectedCard?.curHp! <= 0) {
           // Remove card from play
-          this.gameService.removeCardInPlay(this.player?.id!);
+          this.gameService.removeCardInPlay();
         }
         if (this.userKnockout() && !this.selectedCard?.hasTotem) {
           // Receive totem & regain 1d12 hit points
