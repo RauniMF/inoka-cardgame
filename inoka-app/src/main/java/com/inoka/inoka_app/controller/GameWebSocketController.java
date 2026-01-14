@@ -128,17 +128,6 @@ public class GameWebSocketController {
         );
     }
 
-    @MessageMapping("/gotKnockout")
-    public void handlePlayerPickUpKnockout(Principal principal) {
-        if (principal == null) {
-            logger.warn("Unauthorized knockout attempt");
-            return;
-        }
-        
-        String playerId = principal.getName();
-        gameService.playerPickUpKnockout(playerId);
-    }
-
     @MessageMapping("/clashForfeit")
     public void handlePlayerForfeitClash(Principal principal) {
         if (principal == null) {

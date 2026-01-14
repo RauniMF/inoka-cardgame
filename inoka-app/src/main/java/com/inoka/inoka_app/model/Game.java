@@ -1,7 +1,5 @@
 package com.inoka.inoka_app.model;
 
-import java.lang.reflect.Array;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,6 +27,7 @@ public class Game {
     // Player UUID --> Associated seat number
     private Map<String, Integer> playerSeats;
     private AtomicInteger nextSeat;
+    private long clashProcessingTimestamp;
     
     public Game() {
         this.id = UUID.randomUUID().toString();
@@ -42,6 +41,7 @@ public class Game {
         this.lastAction = new Action();
         this.playerSeats = new HashMap<>();
         this.nextSeat = new AtomicInteger(1);
+        this.clashProcessingTimestamp = 0;
     }
 
     public Game(String passcode) {
@@ -56,6 +56,7 @@ public class Game {
         this.lastAction = new Action();
         this.playerSeats = new HashMap<>();
         this.nextSeat = new AtomicInteger(1);
+        this.clashProcessingTimestamp = 0;
     }
 
     public String getId() {
@@ -286,5 +287,12 @@ public class Game {
             .map(Map.Entry::getKey)
             .findFirst()
             .orElse(null));
+    }
+
+    public void setProcessingTimestamp(long timestamp) {
+        this.clashProcessingTimestamp = timestamp;
+    }
+    public long getClashProcessingTimestamp() {
+        return this.clashProcessingTimestamp;
     }
 }

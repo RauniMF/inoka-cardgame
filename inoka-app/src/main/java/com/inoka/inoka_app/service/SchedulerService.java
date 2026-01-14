@@ -1,6 +1,7 @@
 package com.inoka.inoka_app.service;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -11,9 +12,10 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 
+import com.inoka.inoka_app.event.DeckUpdateEvent;
 import com.inoka.inoka_app.event.GameUpdateEvent;
+import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.Game;
-import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.model.GameView;
 
 @Service
@@ -21,7 +23,8 @@ public class SchedulerService {
 
     private static final Logger logger = LoggerFactory.getLogger(SchedulerService.class);
     private final SimpMessagingTemplate messagingTemplate;
-    private final ConcurrentHashMap<String, Game> pendingGameUpdates = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Game> pendingGameUpdates = new ConcurrentHashMap<>(); // Game id -> Game object w/ changes
+    private final ConcurrentHashMap<String, List<Card>> pendingDeckUpdates = new ConcurrentHashMap<>(); // Player id -> Deck
     private final ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
 
     public SchedulerService(SimpMessagingTemplate messagingTemplate) {
@@ -44,33 +47,46 @@ public class SchedulerService {
                 String gameDestination = "/topic/game/" + game.getId();
                 GameView gameView = GameView.fromGame(game);
                 messagingTemplate.convertAndSend(gameDestination, gameView);
-                logger.debug("Sent GameView for game {} to {}", game.getId(), gameDestination);
+                logger.debug("Sent GameView for game {} to {}", game.getId(), gameDestination);   
+            }
+
+            pendingGameUpdates.clear();
+        }
+
+        if (!pendingDeckUpdates.isEmpty()) {
+            logger.debug("Broadcasting {} pending deck update(s).", pendingDeckUpdates.size());
+            
+            // Send each player their private deck data
+            for (Map.Entry<String, List<Card>> entry : pendingDeckUpdates.entrySet()) {
+                String playerId = entry.getKey();
+                List<Card> deck = entry.getValue();
                 
-                // Send each player their private deck data
-                for (Map.Entry<String, Player> entry : game.getPlayers().entrySet()) {
-                    String playerId = entry.getKey();
-                    Player player = entry.getValue();
-                    
-                    // Send to user-specific queue: /user/{playerId}/queue/deck
-                    messagingTemplate.convertAndSendToUser(
-                        playerId,
-                        "/queue/deck",
-                        player.getDeck()
-                    );
-                    logger.debug("Sent deck update to player {} in game {}", playerId, game.getId());
-                }
+                // Send to user-specific queue: /user/{playerId}/queue/deck
+                messagingTemplate.convertAndSendToUser(
+                    playerId,
+                    "/queue/deck",
+                    deck
+                );
+                logger.debug("Sent deck update to player {}", playerId);
             }
             
-            pendingGameUpdates.clear();
+            pendingDeckUpdates.clear();
         }
     }
 
     public void queueGameUpdate(Game game) {
         pendingGameUpdates.put(game.getId(), game);
     }
+    public void queueDeckUpdate(String playerId, List<Card> deck) {
+        pendingDeckUpdates.put(playerId, deck);
+    }
 
     @EventListener
     public void handleGameUpdateEvent(GameUpdateEvent event) {
         queueGameUpdate(event.getGame());
+    }
+    @EventListener
+    public void handleDeckUpdateEvent(DeckUpdateEvent event) {
+        queueDeckUpdate(event.getPlayerId(), event.getDeck());
     }
 }

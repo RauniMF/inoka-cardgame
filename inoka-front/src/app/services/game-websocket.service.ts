@@ -53,7 +53,7 @@ export class GameWebSocketService {
             });
 
             // Subscribe to deck updates
-            this.stompClient.subscribe('user/queue/deck', (message: IMessage) => {
+            this.stompClient.subscribe('/user/queue/deck', (message: IMessage) => {
                 const deck: Card[] = JSON.parse(message.body);
                 this.deckSubject.next(deck);
             });
@@ -124,15 +124,6 @@ export class GameWebSocketService {
             this.stompClient.publish({
                 destination: "/app/clashAction",
                 body: JSON.stringify(message)
-            })
-        }
-    }
-
-    pickedUpKnockout(): void {
-        if (this.stompClient && this.stompClient.connected) {
-            this.stompClient.publish({
-                destination: "/app/gotKnockout",
-                body: ""
             })
         }
     }

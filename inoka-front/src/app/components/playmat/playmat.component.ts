@@ -128,8 +128,11 @@ export class PlaymatComponent implements OnInit, OnDestroy {
 
                   if (this.mySeat && this.cardsInPlay.has(this.mySeat)) {
                     const card : Card | undefined = this.cardsInPlay.get(this.mySeat);
-                    if (card) {
+                    if (card !== undefined && card !== null) {
                       this.selectedCard = card;
+                    }
+                    else {
+                      this.selectedCard = null;
                     }
                     // If player has forfeited from clash, or clash is concluded, suppress hand component
 
@@ -182,92 +185,25 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   private async onStateChange(state: GameState): Promise<void> {
     switch(state) {
       case GameState.DRAWING_CARDS:
-        //console.log("State reached: Drawing cards.")
-        this.cardsNotRevealed = true;
-        this.handSuppressed = false;
-        if (this.selectedCard) this.selectedCard = null;
-        this.displayStateVisuals(state);
+        await this.handleDrawingCards();
         break;
       case GameState.COUNT_DOWN:
-        //console.log("State reached: Count down.")
         this.startCountdown();
         break;
       case GameState.CLASH_ROLL_INIT:
-        //console.log("State reached: Clash Roll Initiative.")
-        this.cardsNotRevealed = false;
-        this.gameStatus.set("Rolling for initiative.");
-        this.gameService.rollInitForPlayer().subscribe({
-          next: (roll) => {
-            this.gameStatus.set(`Rolled a ${roll} for initiative.`);
-            // Add roll to local storage
-            localStorage.setItem(`game_${this.game?.id}_initRoll_${this.player?.id}`, roll.toString());
-            this.displayStateVisuals(state);
-          },
-          error: (e) => console.log("Error rolling for initiative: ", e)
-        });
+        await this.handleInitiativeRoll();
         break;
       case GameState.CLASH_PLAYER_TURN:
-        // console.log("State reached: Clash Player Turn.")
-        // Wait a few seconds before changing display
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        // If user is last player standing, they win
-        if (this.lastPlayer()) {
-          // INFO:
-          // console.log("Last player check reached.");
-          this.gameService.playerWonClash();
-        }
-        else {
-          this.displayStateVisuals(state);
-        }
+        await this.handlePlayerTurn();
         break;
       case GameState.CLASH_PROCESSING_DECISION:
-        // console.log("State reached: Clash Processing Decision.")
-        this.userTurn = false;
-        // Show choice taken / damage dealt
-        this.gameStatus.set(this.interpretClashAction());
-        // Wait a few seconds before determining next course of action
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        if (this.anyCardsOut()) {
-          // If card was taken out - remove card & let player make choice
-          if (this.selectedCard?.curHp! <= 0) {
-            // Remove card from play
-            this.gameService.removeCardInPlay();
-          }
-          // If player took a knockout, 
-          if (this.userKnockout()) {
-            // Receive totem & regain 1d12 hit points
-            // console.log("Reached 'picked up knockout'!");
-            this.gameWebSocketService.pickedUpKnockout();
-          }
-        }
-        else {
-          // Let back-end know that decision was processed
-          this.gameWebSocketService.clashProcessed(this.game!.id);
-        }
+        await this.handleClashProcessingDecision();
         break;
       case GameState.CLASH_PLAYER_REPLACING_CARD:
-        //console.log("State reached: Player replacing card.")
-        if (this.selectedCard?.curHp! <= 0) {
-          // Prompt user to either play new card, or forfeit
-          this.selectedCard = null;
-          this.gameStatus.set("Put a new card in play? Or forfeit clash?");
-        }
-        else {
-          this.gameStatus.set(`${this.receivedName()} is making a decision...`);
-        }
+        await this.handlePlayerReplacingCard();
         break;
       case GameState.CLASH_CONCLUDED:
-        /*
-         * If a player is prompted to choose a new card while a clash is concluded,
-         * suppress ability to choose new card
-        */
-        this.handSuppressed = true;
-        if (this.selectedCard?.curHp! <= 0) this.selectedCard = null;
-        this.gameStatus.set(`${this.winnerName()} won the clash!`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        // Start next clash
-        this.gameStatus.set("Starting new clash...");
-        this.gameWebSocketService.startNewClash(this.game?.id!);
+        await this.handleClashConcluded();
         break;
     }
   }
@@ -297,18 +233,6 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         }
         else {
           this.gameStatus.set(`Waiting for ${this.currentPlayer()}'s decision...`);
-        }
-        break;
-      case GameState.CLASH_PROCESSING_DECISION:
-        this.cardsNotRevealed = false;
-        // If player card was lost, remove it
-        if (this.selectedCard?.curHp! <= 0) {
-          // Remove card from play
-          this.gameService.removeCardInPlay();
-        }
-        if (this.userKnockout() && !this.selectedCard?.hasTotem) {
-          // Receive totem & regain 1d12 hit points
-          this.gameWebSocketService.pickedUpKnockout();
         }
         break;
       case GameState.CLASH_PLAYER_REPLACING_CARD:
@@ -346,13 +270,11 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   }
 
   isUserTurn(): boolean {
-    const userInit: number = +localStorage.getItem(`game_${this.game?.id}_initRoll_${this.player?.id}`)!;
-    const curInitVal = this.game?.currentInitiativeValue!
-    if (this.game && this.game.state === GameState.CLASH_PLAYER_TURN && userInit == curInitVal) {
-      this.userTurn = true;
-      return true;
+    if (this.mySeat == null) {
+      return false;
     }
-    return false;
+    const curSeat = this.game?.currentPlayerSeat
+    return this.mySeat === curSeat;
   }
 
   currentPlayer(): string {
@@ -416,6 +338,14 @@ export class PlaymatComponent implements OnInit, OnDestroy {
 
   interpretClashAction(): string {
     const resolvedAction: ActionView = this.game?.lastAction!;
+    
+    // Guard against uninitialized or invalid action
+    if (!resolvedAction || 
+        (resolvedAction.dealingSeat === null && resolvedAction.receivingSeat === null) ||
+        resolvedAction.damageDealt === undefined) {
+      return "";
+    }
+    
     let dealingPlayerName: string = "";
     let receivingPlayerName: string = "";
 
@@ -424,10 +354,16 @@ export class PlaymatComponent implements OnInit, OnDestroy {
       if (player.seat == resolvedAction.receivingSeat) receivingPlayerName = player.name;
     }
 
-    /** @todo Verify behavior */
-    if (resolvedAction.dealingSeat === null) return `${receivingPlayerName} forfeited from the clash.`
-    if (resolvedAction.receivingSeat === null) return `${dealingPlayerName} skipped their turn.`
-    return `${dealingPlayerName} dealt ${resolvedAction.damageDealt} damage to ${receivingPlayerName}!`
+    // Handle forfeit (dealingSeat null but receivingSeat exists)
+    if (resolvedAction.dealingSeat === null && receivingPlayerName) {
+      return `${receivingPlayerName} forfeited from the clash.`;
+    }
+    // Handle skip (receivingSeat null but dealingSeat exists)
+    if (resolvedAction.receivingSeat === null && dealingPlayerName) {
+      return `${dealingPlayerName} skipped their turn.`;
+    }
+    // Normal damage
+    return `${dealingPlayerName} dealt ${resolvedAction.damageDealt} damage to ${receivingPlayerName}!`;
   }
 
   anyCardsOut(): boolean {
@@ -501,5 +437,86 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   isForfeitButtonPresent(): boolean {
     if (!this.game || this.handSuppressed) return false;
     return (this.game.state == GameState.CLASH_PLAYER_REPLACING_CARD) && !this.selectedCard
+  }
+
+  // ========== State Handler Methods ==========
+
+  private async handleDrawingCards(): Promise<void> {
+    this.cardsNotRevealed = true;
+    this.handSuppressed = false;
+    if (this.selectedCard) this.selectedCard = null;
+    this.displayStateVisuals(GameState.DRAWING_CARDS);
+  }
+
+  private async handleInitiativeRoll(): Promise<void> {
+    this.cardsNotRevealed = false;
+    this.gameStatus.set("Rolling for initiative.");
+    this.gameService.rollInitForPlayer().subscribe({
+      next: (roll) => {
+        this.gameStatus.set(`Rolled a ${roll} for initiative.`);
+        // Add roll to local storage
+        localStorage.setItem(`game_${this.game?.id}_initRoll_${this.player?.id}`, roll.toString());
+        this.displayStateVisuals(GameState.CLASH_ROLL_INIT);
+      },
+      error: (e) => console.error("Error rolling for initiative: ", e)
+    });
+  }
+
+  private async handlePlayerTurn(): Promise<void> {
+    this.userTurn = this.isUserTurn();
+    
+    // Server automatically detects last player standing, just display turn info
+    this.displayStateVisuals(GameState.CLASH_PLAYER_TURN);
+  }
+
+  private async handleClashProcessingDecision(): Promise<void> {
+    this.userTurn = false;
+
+    const actionMessage = this.interpretClashAction();
+    if (actionMessage) {
+      this.gameStatus.set(actionMessage);
+      await this.delay(3000);
+    }
+  }
+
+  private async handlePlayerReplacingCard(): Promise<void> {
+    // Verify eliminated card is removed from play
+    if (this.selectedCard && this.selectedCard.curHp <= 0) {
+      this.selectedCard = null;
+    }
+
+    if (this.selectedCard == null) {
+      this.gameStatus.set("Put a new card in play? Or forfeit clash?");
+    }
+    else {
+      this.gameStatus.set(`${this.receivedName()} is making a decision...`);
+    }
+  }
+
+  private async handleClashConcluded(): Promise<void> {
+    /*
+     * If a player is prompted to choose a new card while a clash is concluded,
+     * suppress ability to choose new card
+    */
+    this.handSuppressed = true;
+    if (this.selectedCard?.curHp! <= 0) this.selectedCard = null;
+    
+    // Show the final action that ended the clash
+    const actionMessage = this.interpretClashAction();
+    if (actionMessage) {
+      this.gameStatus.set(actionMessage);
+      await this.delay(3000);
+    }
+    
+    this.gameStatus.set(`${this.winnerName()} won the clash!`);
+    await this.delay(3000);
+    // Start next clash
+    this.gameStatus.set("Starting new clash...");
+    /** @todo Verify behavior, handle finishing game */
+    this.gameWebSocketService.startNewClash(this.game?.id!);
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

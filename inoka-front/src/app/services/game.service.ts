@@ -196,8 +196,8 @@ export class GameService {
         return this.http.get<Player[]>(`${this.apiServerUrl}/game/players?id=${gameId}`);
     }
 
-    public setPlayerReady(): Observable<string> {
-        return this.http.put<string>(`${this.apiServerUrl}/player/ready`, null);
+    public setPlayerReady(): Observable<void> {
+        return this.http.put<void>(`${this.apiServerUrl}/player/ready`, null);
     }
 
     public allPlayersReady(gameId: string): Observable<Boolean> {
@@ -207,8 +207,8 @@ export class GameService {
     public startGame(gameId: string): Observable<void> {
         return this.http.put<void>(`${this.apiServerUrl}/game/start`, gameId);
     }
-
-    /** @ignore Clash start handled by websocket service */
+    
+    /** @deprecated Clash start handled by websocket service */
     public startClash(gameId: string): void {
         this.http.put<void>(`${this.apiServerUrl}/game/clash/start`, gameId).subscribe({
             next: () => {},
@@ -216,7 +216,7 @@ export class GameService {
         });
     }
 
-    /** @ignore Clash processing handled by websocket service */
+    /** @deprecated Clash processing handled by websocket service */
     public clashProcessed(gameId: string): void {
         const headers = new HttpHeaders().set('Content-Type', 'text/plain');
         this.http.put<void>(`${this.apiServerUrl}/game/clash/processed`, gameId, { headers, responseType: 'text' as 'json' }).subscribe({
@@ -229,17 +229,19 @@ export class GameService {
         return this.http.get<number>(`${this.apiServerUrl}/player/rollinit`)
     }
 
+    /** @deprecated Server now handles card removal automatically in resolveClashAction. Kept for backward compatibility. */
     public removeCardInPlay(): void {
         this.http.delete<void>(`${this.apiServerUrl}/player/cardInPlay`).subscribe({
             next: () => {},
-            error: (e) => console.log("Error removing card in play: ", e)
+            error: (e) => console.error("Error removing card in play: ", e)
         });
     }
 
+    /** @deprecated Server now handles clash winner detection automatically. Kept for backward compatibility. */
     public playerWonClash(): void{
         this.http.put<void>(`${this.apiServerUrl}/player/wonClash`, null).subscribe({
             next: () => {},
-            error: (e) => console.log("Error checking if player won: ", e)
+            error: (e) => console.error("Error checking if player won: ", e)
         });
     }
 
