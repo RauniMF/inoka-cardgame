@@ -144,7 +144,6 @@ public class GameService {
     
     /**
      * Joins game if game exists & {@code game.numPlayers() < 6}
-     * @deprecated All game join functionality handled by {@code createGame()} method
      */
     public synchronized Optional<Game> joinGame(String passcode, Player player) {
         // Checks if player can join existing game
@@ -445,6 +444,7 @@ public class GameService {
                     
                     game.setLastAction(dealingPlayerId, receivingPlayerId, result.get(0));
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    game.setProcessingTimestamp(System.currentTimeMillis());
                     this.publishGameUpdate(gameId);
                     return game;
                 }
@@ -494,9 +494,19 @@ public class GameService {
      * - Awarding totems for knockouts.
      * - Advancing to the next turn or determining clash winner.
      * </p>
+     * 
+     * <p> Interprets what to handle via {@code Game.lastAction}:
+     * - Both {@code dealingPlayerId} and {@code receivingPlayerId} != "null" ->
+     * Player with id={@code dealingPlayerId} attacked Player with id={@code receivingPlayerId}'s Card in play
+     * and dealt {@code damageDealt}
+     * - {@code dealingPlayerId} != "null" but {@code receivingPlayerId} == "null" ->
+     * Player with id={@code dealingPlayerId} chose to skip their turn
+     * - {@code dealingPlayerId} == "null" but {@code receivingPlayerId} != "null" ->
+     * Player with {@code receivingPlayerId} chose to forfeit from the clash on {@code Game.state == CLASH_PLAYER_REPLACING_CARD}
+     * </p>
      * @param gameId Game UUID
      */
-    private void processClashDecision(String gameId) {
+    void processClashDecision(String gameId) {
         games.computeIfPresent(gameId, (id, game) -> {
             synchronized (game) {
                 if (game.getState() != GameState.CLASH_PROCESSING_DECISION) {
@@ -511,7 +521,7 @@ public class GameService {
                 Card dealingCard = game.getPlayerCardInPlay(dealingPlayerId);
                 Player dealingPlayer = game.getPlayer(dealingPlayerId);
 
-                // Verify receivingPlayer points to valid Player
+                // Verify receivingPlayer points to valid Player -> Attack action taken
                 if (
                     dealingPlayerId != null && !dealingPlayerId.equals("null") &&
                     receivingPlayerId != null && !receivingPlayerId.equals("null")
@@ -547,36 +557,41 @@ public class GameService {
                         game.setState(GameState.CLASH_PLAYER_TURN);
                     }
                 }
-                else {
-                    // Forfeit or skip
-                    if (
-                        dealingPlayerId != null && dealingPlayerId.equals("null") &&
-                        lastAction.getDamageDealt() == -1
-                    ) {
-                        // Player Forfeit - determine if a player has won the clash
-                        if (game.getInitiativeMap().size() == 1 && game.getInitiativeMap().containsValue(dealingPlayerId)) {
-                            // Dealing player won clash
-                            int sacredStones = dealingPlayer.giveSacredStone();
-                            if (sacredStones == 3) {
-                                // 3 stones needed to win
-                                game.setState(GameState.FINISHED);
-                            }
-                            else {
-                                game.setState(GameState.CLASH_CONCLUDED);
-                            }
+                // Dealing player exists & receivingPlayerId == "null" -> Player skipped
+                else if (
+                    dealingPlayerId != null && !dealingPlayerId.equals("null") &&
+                    receivingPlayerId != null && receivingPlayerId.equals("null")
+                ) {
+                    game.determineNextInitiativeValue();
+                    game.setState(GameState.CLASH_PLAYER_TURN);
+                }
+                // dealingPlayerId == "null" & receiving player exists -> Player forfeit
+                else if (
+                    dealingPlayerId != null && dealingPlayerId.equals("null") &&
+                    receivingPlayerId != null && !receivingPlayerId.equals("null")
+                ) {
+                    // Player Forfeit - remove from initiative map
+                    game.removePlayerFromInitiative(game.getPlayer(receivingPlayerId));
+                    
+                    // Determine if a player has won the clash
+                    if (game.getInitiativeMap().size() == 1) {
+                        // Last remaining player won clash - get them from initiative map
+                        String winnerId = game.getInitiativeMap().values().iterator().next();
+                        Player winner = game.getPlayer(winnerId);
+                        int sacredStones = winner.giveSacredStone();
+                        if (sacredStones == 3) {
+                            // 3 stones needed to win
+                            game.setState(GameState.FINISHED);
                         }
                         else {
-                            // More than 1 player remains active in the clash, continue
-                            game.determineNextInitiativeValue();
-                            game.setState(GameState.CLASH_PLAYER_TURN);
+                            game.setState(GameState.CLASH_CONCLUDED);
                         }
                     }
                     else {
-                        // Skipped turn, continue in turn order
+                        // More than 1 player remains active in the clash, continue
                         game.determineNextInitiativeValue();
                         game.setState(GameState.CLASH_PLAYER_TURN);
                     }
-                    
                 }
 
                 this.publishGameUpdate(gameId);
@@ -608,6 +623,7 @@ public class GameService {
                     // Update game state & last action
                     game.setLastAction("null", playerId, -1);
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    game.setProcessingTimestamp(System.currentTimeMillis());
                     this.publishGameUpdate(gameId);
                     return game;
                 }

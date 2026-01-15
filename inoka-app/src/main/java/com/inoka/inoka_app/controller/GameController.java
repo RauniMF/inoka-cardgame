@@ -56,6 +56,7 @@ public class GameController {
     /**
      * @deprecated Mapping disabled.
      */
+    @Deprecated
     public ResponseEntity<List<PlayerEntry>> getAllPlayers() {
         List<Player> players = playerService.findAllPlayers();
         List<PlayerEntry> pEntries = players.stream().map(PlayerEntry::new).collect(Collectors.toList());
@@ -144,6 +145,7 @@ public class GameController {
     /**
      * @deprecated Mapping disabled.
      */
+    @Deprecated
     public ResponseEntity<?> removeAllPlayers() {
         playerService.removeAllPlayers();
         return new ResponseEntity<>(HttpStatus.OK);
@@ -200,6 +202,7 @@ public class GameController {
     /**
      * @deprecated Mapping disabled.
      */
+    @Deprecated
     public ResponseEntity<List<Game>> getAllGames() {
         List<Game> games = gameService.getAllGames();
         return ResponseEntity.ok(games);
