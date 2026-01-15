@@ -4,8 +4,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.Game;
+import com.inoka.inoka_app.model.GameView;
 import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.model.PlayerEntry;
+import com.inoka.inoka_app.model.PlayerView;
 import com.inoka.inoka_app.security.JwtUtil;
 import com.inoka.inoka_app.security.PlayerPrincipal;
 import com.inoka.inoka_app.service.GameService;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +52,11 @@ public class GameController {
         this.jwtUtil = jwtUtil;
     }
 
-    @Deprecated
     // @GetMapping("/player/all")
+    /**
+     * @deprecated Mapping disabled.
+     */
+    @Deprecated
     public ResponseEntity<List<PlayerEntry>> getAllPlayers() {
         List<Player> players = playerService.findAllPlayers();
         List<PlayerEntry> pEntries = players.stream().map(PlayerEntry::new).collect(Collectors.toList());
@@ -96,14 +102,14 @@ public class GameController {
         }
 
         // Verify player exists in the database
-        Optional<Player> playerOptional = playerService.findPlayerById(playerId);
-        if (playerOptional.isEmpty()) {
+        Optional<Player> playerOpt = playerService.findPlayerById(playerId);
+        if (playerOpt.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
 
         // Generate new JWT token for existing player
         String newToken = jwtUtil.generateToken(playerId);
-        PlayerEntry pEntry = new PlayerEntry(playerOptional.get());
+        PlayerEntry pEntry = new PlayerEntry(playerOpt.get());
 
         Map<String, Object> response = new HashMap<>();
         response.put("player", pEntry);
@@ -135,8 +141,11 @@ public class GameController {
         return removed ? new ResponseEntity<>(HttpStatus.OK) : new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
-    @Deprecated
     // @DeleteMapping("/player/remove/all")
+    /**
+     * @deprecated Mapping disabled.
+     */
+    @Deprecated
     public ResponseEntity<?> removeAllPlayers() {
         playerService.removeAllPlayers();
         return new ResponseEntity<>(HttpStatus.OK);
@@ -172,44 +181,63 @@ public class GameController {
     }
 
     @GetMapping("/game/find")
-    public ResponseEntity<Game> findGameByGameId(@AuthenticationPrincipal PlayerPrincipal principal) {
+    public ResponseEntity<GameView> findGame(@AuthenticationPrincipal PlayerPrincipal principal) {
         if (principal == null) {
             return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }
     
         Player player = principal.getPlayer();
-        Optional<Game> game = gameService.getGameById(player.getGameId());
+        Optional<Game> gameOpt = gameService.getGameById(player.getGameId());
         
-        // TODO: Should only return information relevant to the player
-        return game.isPresent() ? ResponseEntity.ok(game.get()) : new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        if (gameOpt.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        GameView gameView = GameView.fromGame(gameOpt.get());
+        return ResponseEntity.ok(gameView);
     }
     
-    @Deprecated
+    
     // @GetMapping("/game/all")
+    /**
+     * @deprecated Mapping disabled.
+     */
+    @Deprecated
     public ResponseEntity<List<Game>> getAllGames() {
         List<Game> games = gameService.getAllGames();
         return ResponseEntity.ok(games);
     }
     
     @GetMapping("/game/players")
-    public ResponseEntity<List<Player>> getPlayersInGame(@RequestParam String id) {
-        Optional<List<Player>> playersList = gameService.getPlayersInGame(id);
-        if (playersList.isPresent()) {
-            List<Player> players = playersList.get();
-            return ResponseEntity.ok(players);
+    public ResponseEntity<List<PlayerView>> getPlayersInGame(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }
-        else {
+    
+        Player player = principal.getPlayer();
+        Optional<Game> gameOpt = gameService.getGameById(player.getGameId());
+        
+        if (gameOpt.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
+
+        List<PlayerView> result = new ArrayList<>(GameView.fromGame(gameOpt.get()).getPlayerViews().values());
+        return ResponseEntity.ok(result);
     }
 
-    @PutMapping(value = "/player/ready", consumes = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<String> setPlayerReady(@RequestBody String id) {
-        boolean success = gameService.setPlayerReady(id);
+    @PutMapping("/player/ready")
+    public ResponseEntity<Void> setPlayerReady(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    
+        Player player = principal.getPlayer();
+
+        boolean success = gameService.setPlayerReady(player.getId());
         if (success) {
-            return ResponseEntity.ok("Player readied up.");
+            return ResponseEntity.noContent().build();
         } else {
-            return ResponseEntity.status(404).body("Error setting player ready: Player not found.");
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -244,30 +272,62 @@ public class GameController {
     }
 
     @GetMapping("/player/rollinit")
-    public ResponseEntity<Integer> rollInitiativeForPlayer(@RequestParam String id) {
-        int result = gameService.rollInitForPlayer(id);
+    public ResponseEntity<Integer> rollInitiativeForPlayer(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    
+        Player player = principal.getPlayer();
+
+        int result = gameService.rollInitForPlayer(player.getId());
         if (result == -1) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         return ResponseEntity.ok(result);
     }
 
     @DeleteMapping("/player/cardInPlay")
-    public ResponseEntity<?> removeCardInPlay(@RequestParam String id) {
-        boolean result = gameService.removePlayerCardInPlay(id);
+    public ResponseEntity<?> removeCardInPlay(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    
+        Player player = principal.getPlayer();
+
+        boolean result = gameService.removePlayerCardInPlay(player.getId());
         if (result) return new ResponseEntity<>(HttpStatus.OK);
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
-    @PutMapping(value = "/player/gotKnockout", consumes = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<?> playerPickUpKnockout(@RequestBody String id) {
-        boolean result = gameService.playerPickUpKnockout(id);
+    @PutMapping("/player/wonClash")
+    public ResponseEntity<?> playerWonClash(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+    
+        Player player = principal.getPlayer();
+
+        boolean result = gameService.playerWonClash(player.getId());
         if (result) return new ResponseEntity<>(HttpStatus.OK);
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
-    @PutMapping(value = "/player/wonClash", consumes = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<?> playerWonClash(@RequestBody String id) {
-        boolean result = gameService.playerWonClash(id);
-        if (result) return new ResponseEntity<>(HttpStatus.OK);
-        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    @GetMapping("/player/seat")
+    public ResponseEntity<Integer> getPlayerSeat(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
+        Player player = principal.getPlayer();
+
+        Optional<Game> gameOpt = gameService.getGameByPlayerId(player.getId());
+        if (gameOpt.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        int seat = gameOpt.get().getSeatForPlayer(player.getId());
+        if (seat == -1) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        return ResponseEntity.ok(seat);
     }
 }

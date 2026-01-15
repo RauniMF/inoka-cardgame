@@ -3,8 +3,9 @@ import { UserComponent } from './user.component';
 import { QueueComponent } from './queue.component';
 import { GameService } from '../../services/game.service';
 import { Router } from '@angular/router';
-import { Game, GameState } from '../game';
+import { Game, GameState, GameView } from '../game';
 import { Subscription } from 'rxjs';
+import { GameWebSocketService } from '../../services/game-websocket.service';
 
 @Component({
     selector: 'app-front',
@@ -17,6 +18,7 @@ import { Subscription } from 'rxjs';
     passcode: string = '';
     
     private gameService = inject(GameService);
+    private gameWebSocketService = inject(GameWebSocketService);
     private router = inject(Router);
     private gameSubscription: Subscription | null = null;
 
@@ -29,8 +31,8 @@ import { Subscription } from 'rxjs';
     }
 
     ngOnInit(): void {
-      this.gameSubscription = this.gameService.game$.subscribe(
-        (game: Game | null) => {
+      this.gameSubscription = this.gameWebSocketService.gameUpdates$.subscribe(
+        (game: GameView | null) => {
           if (game == null || game?.state === null) return; // Player is not in game
 
           switch(game.state) {

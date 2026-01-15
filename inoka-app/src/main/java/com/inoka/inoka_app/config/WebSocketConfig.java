@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.WebSocketHandler;
@@ -55,7 +56,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 public void afterHandshake(@NonNull ServerHttpRequest request, 
                                            @NonNull ServerHttpResponse response,
                                            @NonNull WebSocketHandler wsHandler, 
-                                           Exception exception) {
+                                           @Nullable Exception exception) {
                     // No action needed
                 }
             })

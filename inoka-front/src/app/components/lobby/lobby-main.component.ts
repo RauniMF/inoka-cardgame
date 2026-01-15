@@ -5,6 +5,8 @@ import { Observable, Subscription } from 'rxjs';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { PlayerEntryComponent } from './player-entry/player-entry.component';
+import { GameWebSocketService } from '../../services/game-websocket.service';
+import { GameView, PlayerView } from '../game';
 
 @Component({
   selector: 'app-lobby-main',
@@ -16,9 +18,11 @@ import { PlayerEntryComponent } from './player-entry/player-entry.component';
 export class LobbyMainComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private gameService = inject(GameService);
+  private gameWebSocketService = inject(GameWebSocketService);
   
   public player: Player | null = null;
-  players: Player[] = [];
+  private game: GameView | null = null;
+  players: PlayerView[] = [];
   lobbyStatus = signal("Waiting for players");
   private playerSubscription: Subscription | null = null;
   private gameSubscription: Subscription | null = null;
@@ -41,22 +45,50 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
       next: (player) => {
         this.player = player;
 
+        // INFO: 
+        console.log("Player loaded: ", player);
+
         if (this.player?.gameId && this.player.gameId !== 'Not in game') {
-          const gameId = this.player.gameId;
-    
-          // Get all players data for lobby status
-          this.gameSubscription = this.gameService.game$.subscribe({
-            next: (gameUpdate) => {
-              if (gameUpdate) {
-                this.players = Array.isArray(gameUpdate.players) ? gameUpdate.players : Object.values(gameUpdate.players);
-                this.updateLobbyStatus();
+          this.gameService.getGame().subscribe({
+            next: (gameView) => {
+              if (gameView && gameView.id === this.player?.gameId) {
+                this.game = gameView;
+                // INFO:
+                // console.log("Game loaded: ", gameView);
+                // Get other players
+                if (this.game) {
+                  this.players = Array.isArray(this.game.playerViews) ? this.game.playerViews : Object.values(this.game.playerViews);
+                  console.log("Players loaded: ", this.players);
+                  this.updateLobbyStatus();
+                }
               }
             },
-            error: (e) => console.log("Could not fetch Game data in lobby-main: ", e)
+            error: (e) => {
+              if (e.status === 404) {
+                console.log("Player not in game.");
+              }
+              else {
+                console.log("Error fetching Game details: ", e);
+              }
+            }
           });
         }
       },
       error: (e) => console.error(`Could not fetch player data in lobby-main: `, e)
+    });
+
+    // Subscribe to WebSocket updates
+    this.gameSubscription = this.gameWebSocketService.gameUpdates$.subscribe({
+      next: (gameUpdate) => {
+        if (gameUpdate) {
+          this.game = gameUpdate;
+          // INFO:
+          // console.log("Game loaded from WebSocket: ", gameUpdate);
+          this.players = Array.isArray(gameUpdate.playerViews) ? gameUpdate.playerViews : Object.values(gameUpdate.playerViews);
+          this.updateLobbyStatus();
+        }
+      },
+      error: (e) => console.log("Could not fetch Game data in lobby-main: ", e)
     });
   }
 
@@ -81,7 +113,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
       this.gameService.allPlayersReady(gameId).subscribe({
         next: (r) => {
           const allReady = r;
-          if (allReady && this.startingFlag) this.startGameCooldown();
+          if (allReady && this.startingFlag) this.startGameCooldown(gameId);
           else this.lobbyStatus.set("Waiting for all players to be ready...");
         },
         error: (e) => console.error(`Game id:${gameId} error returning player ready status: `, e)
@@ -102,7 +134,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
    */
   toggleReady(): void {
     if (this.player?.id) {
-      this.gameService.setPlayerReady(this.player.id).subscribe({
+      this.gameService.setPlayerReady().subscribe({
         next: (r) => {
           this.updateLobbyStatus();
         },
@@ -111,7 +143,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
     }
   }
   
-  startGameCooldown(): void {
+  startGameCooldown(gameId: string): void {
     let count = 5;
     this.lobbyStatus.set(`Game starting in: ${count}`);
     this.startingFlag = false;
@@ -124,7 +156,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
         clearInterval(interval);
         // Navigate to game page
         this.lobbyStatus.set("Game starting...");
-        this.gameService.startGame().subscribe({
+        this.gameService.startGame(gameId).subscribe({
           next: () => {
             console.log("Game starting.");
             this.router.navigate(["/game"]);

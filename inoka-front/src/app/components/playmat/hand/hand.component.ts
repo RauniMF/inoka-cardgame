@@ -27,11 +27,10 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
   handState = signal<HandState>('choosing');
   
   public player: Player | null = null;
-  private playerSubscription: Subscription | null = null;
-  private gameSubscription: Subscription | null = null;
+  private deckSubscription: Subscription | null = null;
 
-  private gameService = inject(GameService);
   private gameWebSocketService = inject(GameWebSocketService);
+  private gameService = inject(GameService);
 
   ngOnInit(): void {
     this.fetchCards();
@@ -39,11 +38,11 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
 
   ngOnDestroy(): void {
     // Clean up subscriptions
-    this.playerSubscription?.unsubscribe();
-    this.gameSubscription?.unsubscribe();
+    this.deckSubscription?.unsubscribe();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    setTimeout(() => {
       if (this.suppressChoosing || (changes['existingCard'] && changes['existingCard'].currentValue)) {
         this.updateState('stowed');
       }
@@ -53,39 +52,33 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
       ){
         this.updateState('choosing');
       }
+    });
   }
 
   updateState(state: HandState): void {
     this.handState.set(state);
+    // INFO: 
+    // console.log("Hand state: ", state);
     this.handStateEmitter.emit(state);
   }
 
   fetchCards(): void {
-    // Get user's player data from service
-    this.playerSubscription = this.gameService.player$.subscribe({
-      next: (player) => {
-        this.player = player;
-
-        if (this.player?.gameId && this.player.gameId !== 'Not in game') {
-          const playerId = this.player.id;
-    
-          // Get all players data for lobby status
-          this.gameSubscription = this.gameService.game$.subscribe({
-            next: (game) => {
-              if (playerId && game?.players && typeof game.players === 'object') {
-                const playerTransient = (game.players as Record<string, any>)[playerId];
-                if (playerTransient?.deck) {
-                  this.cards = playerTransient.deck;
-                  // console.log("Cards loaded: ", this.cards);
-                }
-              }
-            },
-            error: (e) => console.log("Could not fetch Game data in hand: ", e)
-          });
-        }
+    this.gameService.getPlayerDeck().subscribe({
+      next: (deck) => {
+        if (deck) this.cards = deck;
       },
-      error: (e) => console.error(`Could not fetch player data in hand: `, e)
+      error: (e) => {
+        console.log("Error fetching cards: ", e);
+      }
     });
+
+    // Subscribe to WebSocket updates
+    this.deckSubscription = this.gameWebSocketService.deckUpdates$
+      .subscribe((deck: Card[] | null) => {
+        if (deck) this.cards = deck;
+        // INFO:
+        console.log("Fetched deck from WebSocket: ", deck);
+      });
   }
 
   onHover(index: number | null): void {
@@ -93,11 +86,11 @@ export class HandComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   onSelectCard(card: Card, index: number): void {
-    if(this.handState() === 'choosing' && this.player) {
+    if(this.handState() === 'choosing') {
       this.selectedCard.set(card);
       this.selectedCardEmitter.emit(card);
       this.cards.splice(index, 1);
-      this.gameWebSocketService.playCard(this.player.id, card);
+      this.gameWebSocketService.playCard(card);
     }
   }
 

@@ -13,12 +13,15 @@
 - GameWebSocketController message handling (DONE)
 - Broadcasts using ScheduledExecutorService in GameService (Done)
 - Games map as ConcurrentHashMap + synchronized() implementation for Game object modification (Done)
-- Look at refactoring GameService
+     - Revisit concurrency when looking at rate limiting?
+- Look at refactoring GameService / other code
      - Currently handles all business logic operations between the controller and repository layers, which includes basic crud operations with the database & higher level game logic
      - Might be beneficial to separate the crud operations into a PlayerService (Done)
 - Expand on unit and integration tests
      - Update existing tests to spoof the service layer with mockito (Done)
      - Implement restful api mvc test cases with MockMVC or a similar framework
+     - Test security classes
+     - More test coverage
 - Authentication and Security
      - Implement authentication using JWT for session tokens
      - Store user token in secure cookie
@@ -28,6 +31,9 @@
      - Refactor WebSocket Game objects to obfuscate sensitive player information like UUID
           - Figure out how to properly identify users via custom IDs in Game object, as well has how to identify the user's Player object in the array using thisPlayer() method in playmat
           - Modify Game object to assign pseudo-IDs when adding Player objects to the game
+          - Modify Game/GameView to assign players with empty usernames name = 'Player {player.seat}' to identify players who didn't assign themselves a username (DONE)
+     - HTTPS
+     - Rate Limiting
 
 > Implement front end
 - Get page setup for basic implementation
@@ -73,6 +79,7 @@
       - Route back to front page after cleaning up game
 - Develop each game state
 - Option to leave lobby / game
+- Add timer to player action with default option if no input
 
 > Other in-game features
 - Class features

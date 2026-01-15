@@ -6,7 +6,7 @@
             <app-card
                 [card]="selectedCard"
                 [isFlipped]="cardsNotRevealed"
-                (click)="$event.stopPropagation(); toggleDropdown($event, this.player?.id)"
+                (click)="$event.stopPropagation(); toggleDropdown($event, thisPlayer()?.seat)"
             ></app-card>
             @if (userTurn) {
                 <button class="skip-turn-btn" (click)="skipTurn($event)">
@@ -21,17 +21,17 @@
         }
         </div>
     
-        @for (player of otherPlayers(); track player.id; let index = $index) {
+        @for (player of otherPlayers(); track player.seat; let index = $index) {
         <div class="player-position" [ngClass]="'position-' + (index + 1)">
             <div class="player-name">
                 <h3>{{ player.name }}</h3>
                 <p>{{ player.sacredStones }}</p>
             </div>
-            @if (cardsInPlay.has(player.id)) {
+            @if (cardsInPlay.has(player.seat)) {
                 <app-card
-                    [card]="cardsInPlay.get(player.id)!"
+                    [card]="cardsInPlay.get(player.seat)!"
                     [isFlipped]="cardsNotRevealed"
-                    (click)="$event.stopPropagation(); toggleDropdown($event, player.id)"
+                    (click)="$event.stopPropagation(); toggleDropdown($event, player.seat)"
                 ></app-card>
             }
         </div>
@@ -39,10 +39,10 @@
     </div>
     @if (dropdownData[2]) {
         <div class="floating-dropdown" [style.left.px]="dropdownData[0]" [style.top.px]="dropdownData[1]">
-            @if (selectedPlayerId != this.player?.id) {
+            @if (selectedPlayerSeat != thisPlayer()?.seat) {
             <button
                 class="attack-btn"
-                (click)="$event.stopPropagation(); attackCard($event, selectedPlayerId!)"
+                (click)="$event.stopPropagation(); attackCard($event, selectedPlayerSeat!)"
             >Attack</button>
             }
             @else {

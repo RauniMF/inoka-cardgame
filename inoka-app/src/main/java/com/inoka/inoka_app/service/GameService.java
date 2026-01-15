@@ -1,16 +1,22 @@
 package com.inoka.inoka_app.service;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 
+import com.inoka.inoka_app.event.DeckUpdateEvent;
 import com.inoka.inoka_app.event.GameUpdateEvent;
 import com.inoka.inoka_app.model.Player;
+
+import jakarta.annotation.PostConstruct;
+
 import com.inoka.inoka_app.model.Action;
 import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.CardStyle;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,11 +36,37 @@ public class GameService {
         this.eventPublisher = eventPublisher;
     }
     
-    
+    // TODO: Revisit concurrent implementation
     private void publishGameUpdate(String gameId) {
         Game game = games.get(gameId);
         if (game != null) {
             eventPublisher.publishEvent(new GameUpdateEvent(this, game));
+        }
+    }
+    private void publishDeckUpdate(Player player) {
+        List<Card> deck = player.getDeck();
+        eventPublisher.publishEvent(new DeckUpdateEvent(this, player.getId(), deck));
+    }
+
+    @PostConstruct
+    private void startClashDecisionAutoAdvanceTask() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setThreadNamePrefix("clash-decision-advance-");
+        scheduler.initialize();
+        scheduler.scheduleAtFixedRate(
+            this::checkAndAdvanceClashDecisions,
+            Duration.ofMillis(500)
+        );
+    }
+    private void checkAndAdvanceClashDecisions() {
+        long now = System.currentTimeMillis();
+        long CLASH_PROCESS_DELAY_MS = 1000;
+        for (Game game : games.values()) {
+            if (game.getState() == GameState.CLASH_PROCESSING_DECISION) {
+                if (now - game.getClashProcessingTimestamp() >= CLASH_PROCESS_DELAY_MS) {
+                    this.processClashDecision(game.getId());
+                }
+            }
         }
     }
     
@@ -58,12 +90,26 @@ public class GameService {
         return this.games.contains(gameId);
     }
 
+    public Optional<Game> getGameByPlayerId(String playerId) {
+        Optional<Player> playerOpt = playerService.findPlayerById(playerId);
+        if (playerOpt.isEmpty()) return Optional.empty();
+
+        String gameId = playerOpt.get().getGameId();
+        return this.getGameById(gameId);
+    }
+
+    /**
+     * Returns the transient deck (List of Card objects) belonging to player with input playerId
+     * @param playerId Player UUID
+     * @return {@code Optional<List<Card>>} representing present deck data belonging to the player 
+     * stored in transient Game object, or {@code Optional.empty} if not found
+     */
     public Optional<List<Card>> getPlayerDeck(String playerId) {
-        Optional<Player> playerCheck = playerService.findPlayerById(playerId);
-        if (!playerCheck.isPresent()) {
+        Optional<Player> playerOpt = playerService.findPlayerById(playerId);
+        if (!playerOpt.isPresent()) {
             return Optional.empty();
         }
-        Player playerTransient = playerCheck.get();
+        Player playerTransient = playerOpt.get();
         String gameId = playerTransient.getGameId();
         if ((gameId.equals("Not in game")) || (gameId == null) || (gameId.isEmpty())) {
             return Optional.empty();
@@ -78,14 +124,16 @@ public class GameService {
         return Optional.empty();
     }
     
-    /*
+    /**
      * Creates or joins existing game
+     * @param passcode Used to identify game lobby to join
+     * @param player Player object to add to game
      */
     public synchronized Game createGame(String passcode, Player player) {
         // Check if player can join existing game
         // Can also use .orElseGet() for more succinct code but I think this is a little more readable
-        Optional<Game> gameCheck = this.joinGame(passcode, player);
-        if (gameCheck.isPresent()) return gameCheck.get();
+        Optional<Game> gameOpt = this.joinGame(passcode, player);
+        if (gameOpt.isPresent()) return gameOpt.get();
 
         // If no suitable game was found, create a new game with the given passcode
         Game game = (passcode != null && !passcode.isEmpty()) ? new Game(passcode) : new Game();
@@ -94,8 +142,8 @@ public class GameService {
         return game;
     }
     
-    /*
-     * Joins game if game exists & game.numPlayers() < 6
+    /**
+     * Joins game if game exists & {@code game.numPlayers() < 6}
      */
     public synchronized Optional<Game> joinGame(String passcode, Player player) {
         // Checks if player can join existing game
@@ -123,9 +171,6 @@ public class GameService {
         return Optional.empty();
     }
 
-    /*
-     * Handles adding player to game object
-     */
     public void addPlayerToGame(String gameId, Player player) {
         games.computeIfPresent(gameId, (id, game) -> {
             synchronized (game) {
@@ -137,10 +182,6 @@ public class GameService {
         });
     }
 
-    /*
-     * Given the UUID of a game,
-     * Return a List of players in game
-     */
     public Optional<List<Player>> getPlayersInGame(String gameId) {
         // Mutable object you can modify inside lambda expression
         final List<Optional<List<Player>>> result = new ArrayList<>(1);
@@ -155,16 +196,16 @@ public class GameService {
         return result.get(0);
     }
 
-    /*
-     * Given a player's UUID,
-     * set the player's isReady to True
-     * Returns true if success
-     * else false
+    /**
+     * Given a player's UUID, set the corresponding Player object's {@code isReady} attribute
+     * stored in the transient Game data to True
+     * @param playerId Player UUID
+     * @return {@code boolean} True if Player.isReady set to True, False otherwise
      */
     public boolean setPlayerReady(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
             // Set player ready in transient Game data
             String gameId = player.getGameId();
             
@@ -182,29 +223,28 @@ public class GameService {
         }
     }
 
-    /*
-     * Given the UUID of a game,
-     * Check if all players in a game are ready to start match
-     * Returns Optional.empty() if gameId is invalid
-     * Returns true if all players in game are ready
-     * Returns false otherwise
+    /**
+     * Given the UUID of a game, check if all players in a game are ready to start match
+     * @param gameID Game UUID
+     * @return {@code Optional<Boolean>} Optional.empty if gameId is invalid,
+     * returns True if all players in game are ready, False otherwise
      */
     public Optional<Boolean> allPlayersReady(String gameId) {
-        Optional<List<Player>> playersCheck = this.getPlayersInGame(gameId);
+        Optional<List<Player>> playersListOpt = this.getPlayersInGame(gameId);
 
-        if (playersCheck.isEmpty()) {
+        if (playersListOpt.isEmpty()) {
             return Optional.empty();
         }
 
-        for (Player player : playersCheck.get()) if(!player.isReady()) return Optional.of(false);
+        for (Player player : playersListOpt.get()) if(!player.isReady()) return Optional.of(false);
 
         return Optional.of(true);
     }
 
-    /*
-     * Given the UUID of a game,
-     * set the GameState to DRAWING_CARDS
-     * and queue broadcast
+    /**
+     * Given the UUID of a game, set the GameState to DRAWING_CARDS if conditions are met
+     * @param gameId Game UUID
+     * @return {@code boolean} True if Game object was set to DRAWING_CARDS, False otherwise
      */
     public boolean setGameStart(String gameId) {
         final List<Boolean> result = new ArrayList<>(1);
@@ -231,6 +271,7 @@ public class GameService {
                         game.setState(GameState.CLASH_ROLL_INIT);
                         // Initiative values are re-rolled at start of clash
                         game.resetInitiativeValue();
+                        game.clearInitiativeMap();
                         result.set(0, true);
                         this.publishGameUpdate(gameId);
                     }
@@ -276,16 +317,19 @@ public class GameService {
         return result.get(0);
     }
 
-    /*
+    /**
      * Given the UUID of a player and a Card object,
-     * Add the card to the Map of cards in play
-     * in the game the player is in
-     * Returns true if successful, false otherwise
+     * add the card to the Map of cards in play.
+     * Also handles GameState changes from {@code DRAWING_CARDS} to {@code COUNT_DOWN},
+     * as well as {@code CLASH_PLAYER_REPLACING_CARD} to {@code CLASH_PLAYER_TURN}
+     * @param playerId Player UUID
+     * @param card Card object to put in play
+     * @return {@code boolean} True if input playerId points to existing Player, False otherwise
      */
     public boolean putCardInPlay(String playerId, Card card) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
@@ -314,6 +358,7 @@ public class GameService {
                         game.determineNextInitiativeValue();
                     }
                     this.publishGameUpdate(gameId);
+                    this.publishDeckUpdate(player);
                     return game;
                 }
             });
@@ -323,10 +368,15 @@ public class GameService {
         }
     }
 
+    /**
+     * Rolls unique initiative value for player with input playerId in transient Game object
+     * @param playerId Player UUID
+     * @return {@code int} value rolled for initiative if successful, or -1 otherwise
+     */
     public int rollInitForPlayer(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
@@ -362,30 +412,39 @@ public class GameService {
         return -1;
     }
 
-    /*
-     * Given the UUID of a player taking action on a CLASH_PLAYER_TURN,
-     * and the UUID of the player whose card was chosen to take damage,
-     * or "null" if a player chose to skip their turn,
-     * deal the damage and change GameState to CLASH_PROCESSING_DECISION,
-     * returning how much damage was dealt,
-     * or -1 if the player chose to skip their turn
+    /**
+     * On {@code Game.state == CLASH_PLAYER_TURN}, given the input UUID of a player taking action
+     * and the UUID of the player they chose to take action against, or "null" if that player
+     * chose to skip their turn, deal damage and/or change GameState to {@code CLASH_PROCESSING_DECISION}
+     * @param dealingPlayerId Dealing Player UUID
+     * @param receivingPlayerId Receiving Player UUID
+     * @return {@code int} damage dealt to receiving Player's Card, -1 if no damage dealt.
      */
     public int resolveClashAction(String dealingPlayerId, String receivingPlayerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(dealingPlayerId);
+        Optional<Player> playerOpt = this.playerService.findPlayerById(dealingPlayerId);
         final List<Integer> result = new ArrayList<>(1);
         result.add(-1);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
                 synchronized (game) {
-                    if (!receivingPlayerId.equals("null")) {
-                        int damage = game.dealDamage(dealingPlayerId, receivingPlayerId);
-                        result.set(0, damage);
+                    // Guard: only allow actions during CLASH_PLAYER_TURN
+                    if (game.getState() != GameState.CLASH_PLAYER_TURN) {
+                        return game;
                     }
+
+                    int damage = -1;
+                    if (!receivingPlayerId.equals("null")) {
+                        // Deal damage
+                        damage = game.dealDamage(dealingPlayerId, receivingPlayerId);
+                        result.set(0, damage);
+                    } 
+                    
                     game.setLastAction(dealingPlayerId, receivingPlayerId, result.get(0));
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    game.setProcessingTimestamp(System.currentTimeMillis());
                     this.publishGameUpdate(gameId);
                     return game;
                 }
@@ -394,21 +453,29 @@ public class GameService {
         return result.get(0);
     }
 
-    // Remove player's card from play
     public boolean removePlayerCardInPlay(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
                 synchronized (game) {
+                    // If card not present, no-op
+                    if (!game.getCardsInPlay().containsKey(playerId)) {
+                        return game;
+                    }
+                    
                     Card removedCard = game.removeCardInPlay(playerId);
                     if (removedCard != null) {
                         result.set(0, true);
-                        if (game.getState() == GameState.CLASH_PROCESSING_DECISION) game.setState(GameState.CLASH_PLAYER_REPLACING_CARD);
+                        // Note: State transitions now handled in resolveClashAction
+                        // This method is kept for legacy/explicit removal if needed
+                        if (game.getState() == GameState.CLASH_PROCESSING_DECISION) {
+                            game.setState(GameState.CLASH_PLAYER_REPLACING_CARD);
+                        }
                         this.publishGameUpdate(gameId);
                     }
                     return game;
@@ -417,63 +484,132 @@ public class GameService {
         }
         return result.get(0);
     }
-
-    /*
-     * Given the UUID of a player who picked up a knockout,
-     * give them the totem & restore 1d12 hit points to their card
-     * return true if successful, false otherwise
+    
+    /**
+     * Processes the results of a clash action for a Game with {@code Game.state == CLASH_PROCESSING_DECISION}.
+     * Called automatically by the internal scheduler after a delay.
+     * 
+     * <p> This method handles: 
+     * - Removing defeated cards from play.
+     * - Awarding totems for knockouts.
+     * - Advancing to the next turn or determining clash winner.
+     * </p>
+     * 
+     * <p> Interprets what to handle via {@code Game.lastAction}:
+     * - Both {@code dealingPlayerId} and {@code receivingPlayerId} != "null" ->
+     * Player with id={@code dealingPlayerId} attacked Player with id={@code receivingPlayerId}'s Card in play
+     * and dealt {@code damageDealt}
+     * - {@code dealingPlayerId} != "null" but {@code receivingPlayerId} == "null" ->
+     * Player with id={@code dealingPlayerId} chose to skip their turn
+     * - {@code dealingPlayerId} == "null" but {@code receivingPlayerId} != "null" ->
+     * Player with {@code receivingPlayerId} chose to forfeit from the clash on {@code Game.state == CLASH_PLAYER_REPLACING_CARD}
+     * </p>
+     * @param gameId Game UUID
      */
-    public boolean playerPickUpKnockout(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
-        final List<Boolean> result = new ArrayList<>(1);
-        result.add(false);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+    void processClashDecision(String gameId) {
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                if (game.getState() != GameState.CLASH_PROCESSING_DECISION) {
+                    return game;
+                }
 
-            String gameId = player.getGameId();
-            games.computeIfPresent(gameId, (id, game) -> {
-                synchronized (game) {
-                    Player playerTransient = game.getPlayer(player.getId());
-                    Action lastAction = game.getLastAction();
-                    // Verify player took action this turn
-                    if (playerId.equals(lastAction.getDealingPlayerId())) {
-                        result.set(0, true);
-                        Card playerCard = game.getPlayerCardInPlay(playerId);
-                        if (playerCard.isHasTotem() && playerCard.getStyle() == CardStyle.ATTACKER) {
-                            // Player wins clash
-                            int sacredStones = playerTransient.giveSacredStone();
+                Action lastAction = game.getLastAction();
+                String dealingPlayerId = lastAction.getDealingPlayerId();
+                String receivingPlayerId = lastAction.getReceivingPlayerId();
+
+                // Reward dealing Player for knockout
+                Card dealingCard = game.getPlayerCardInPlay(dealingPlayerId);
+                Player dealingPlayer = game.getPlayer(dealingPlayerId);
+
+                // Verify receivingPlayer points to valid Player -> Attack action taken
+                if (
+                    dealingPlayerId != null && !dealingPlayerId.equals("null") &&
+                    receivingPlayerId != null && !receivingPlayerId.equals("null")
+                ){
+                    Card receivingCard = game.getPlayerCardInPlay(receivingPlayerId);
+                    if (receivingCard != null && receivingCard.getCurHp() <= 0) {
+                        // Recipient was knocked out
+                        game.removeCardInPlay(receivingPlayerId);
+
+                        if (dealingCard != null && dealingCard.isHasTotem()
+                            && dealingCard.getStyle() == CardStyle.ATTACKER)
+                        {
+                            // Attacker style card picks up knockout with totem = wins clash
+                            int sacredStones = dealingPlayer.giveSacredStone();
                             if (sacredStones == 3) {
-                                // Player wins game
+                                // 3 stones needed to win
                                 game.setState(GameState.FINISHED);
                             }
                             else {
                                 game.setState(GameState.CLASH_CONCLUDED);
                             }
-                            this.publishGameUpdate(gameId);
-                            return game;
                         }
-                        // Otherwise, give player's card totem & heal
-                        game.resetCardsTotem(); // Only one player can have totem
-                        game.playerGiveTotem(playerId);
-                        this.publishGameUpdate(gameId);
+                        else {
+                            // Give totem to dealing Player's Card, recipient must replace card
+                            game.resetCardsTotem();
+                            game.playerGiveTotem(dealingPlayerId);
+                            game.setState(GameState.CLASH_PLAYER_REPLACING_CARD);
+                        }
                     }
-                    return game;
+                    else {
+                        // No knockout, continue in turn order
+                        game.determineNextInitiativeValue();
+                        game.setState(GameState.CLASH_PLAYER_TURN);
+                    }
                 }
-            });
-        }
-        return result.get(0);
+                // Dealing player exists & receivingPlayerId == "null" -> Player skipped
+                else if (
+                    dealingPlayerId != null && !dealingPlayerId.equals("null") &&
+                    receivingPlayerId != null && receivingPlayerId.equals("null")
+                ) {
+                    game.determineNextInitiativeValue();
+                    game.setState(GameState.CLASH_PLAYER_TURN);
+                }
+                // dealingPlayerId == "null" & receiving player exists -> Player forfeit
+                else if (
+                    dealingPlayerId != null && dealingPlayerId.equals("null") &&
+                    receivingPlayerId != null && !receivingPlayerId.equals("null")
+                ) {
+                    // Player Forfeit - remove from initiative map
+                    game.removePlayerFromInitiative(game.getPlayer(receivingPlayerId));
+                    
+                    // Determine if a player has won the clash
+                    if (game.getInitiativeMap().size() == 1) {
+                        // Last remaining player won clash - get them from initiative map
+                        String winnerId = game.getInitiativeMap().values().iterator().next();
+                        Player winner = game.getPlayer(winnerId);
+                        int sacredStones = winner.giveSacredStone();
+                        if (sacredStones == 3) {
+                            // 3 stones needed to win
+                            game.setState(GameState.FINISHED);
+                        }
+                        else {
+                            game.setState(GameState.CLASH_CONCLUDED);
+                        }
+                    }
+                    else {
+                        // More than 1 player remains active in the clash, continue
+                        game.determineNextInitiativeValue();
+                        game.setState(GameState.CLASH_PLAYER_TURN);
+                    }
+                }
+
+                this.publishGameUpdate(gameId);
+                return game;
+            }
+        });
     }
 
-    /*
+    /**
      * Given a player's UUID,
      * discard their card in play
      * and remove them from the initiative order
      */
     public void playerForfeitClash(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
         
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
@@ -487,6 +623,7 @@ public class GameService {
                     // Update game state & last action
                     game.setLastAction("null", playerId, -1);
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    game.setProcessingTimestamp(System.currentTimeMillis());
                     this.publishGameUpdate(gameId);
                     return game;
                 }
@@ -494,17 +631,17 @@ public class GameService {
         }
     }
 
-    /*
+    /**
      * Given a player's UUID,
      * verify that they've won the clash,
      * then award them if they won
      */
     public boolean playerWonClash(String playerId) {
-        Optional<Player> playerCheck = this.playerService.findPlayerById(playerId);
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
-        if (playerCheck.isPresent()) {
-            Player player = playerCheck.get();
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
 
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {

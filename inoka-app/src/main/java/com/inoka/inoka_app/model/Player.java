@@ -104,6 +104,9 @@ public class Player implements Serializable {
     public List<Card> getDeck() {
         return deck;
     }
+    public int getDeckSize() {
+        return this.deck.size();
+    }
 
     public int getSacredStones() {
         return sacredStones;
