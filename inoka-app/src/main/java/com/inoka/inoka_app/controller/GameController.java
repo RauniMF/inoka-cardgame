@@ -4,10 +4,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.Game;
+import com.inoka.inoka_app.model.GameState;
 import com.inoka.inoka_app.model.GameView;
 import com.inoka.inoka_app.model.Player;
 import com.inoka.inoka_app.model.PlayerEntry;
 import com.inoka.inoka_app.model.PlayerView;
+import com.inoka.inoka_app.model.PodiumView;
 import com.inoka.inoka_app.security.JwtUtil;
 import com.inoka.inoka_app.security.PlayerPrincipal;
 import com.inoka.inoka_app.service.GameService;
@@ -330,4 +332,32 @@ public class GameController {
 
         return ResponseEntity.ok(seat);
     }
+
+    @GetMapping("/game/podium")
+    public ResponseEntity<PodiumView> getMethodName(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
+        Player player = principal.getPlayer();
+
+        Optional<Game> gameOpt = gameService.getGameByPlayerId(player.getId());
+        if (gameOpt.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        Game game = gameOpt.get();
+
+        if (game.getState() != GameState.FINISHED) {
+            return new ResponseEntity<>(HttpStatus.CONFLICT);
+        }
+
+        if (!game.getPlayers().containsKey(player.getId())) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        PodiumView podiumView = PodiumView.fromGame(game);
+        return ResponseEntity.ok(podiumView);
+    }
+    
 }

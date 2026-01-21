@@ -376,6 +376,9 @@ public class GameService {
             Player player = playerOpt.get();
 
             String gameId = player.getGameId();
+            final List<Boolean> result = new ArrayList<>(1);
+            result.add(false);
+            
             games.computeIfPresent(gameId, (id, game) -> {
                 synchronized (game) {
                     if (
@@ -410,10 +413,11 @@ public class GameService {
                     }
                     this.publishGameUpdate(gameId);
                     this.publishDeckUpdate(player);
+                    result.set(0, true);
                     return game;
                 }
             });
-            return true;
+            return result.get(0);
         } else {
             return false;
         }
@@ -430,6 +434,9 @@ public class GameService {
             Player player = playerOpt.get();
 
             String gameId = player.getGameId();
+            final List<Integer> result = new ArrayList<>(1);
+            result.add(-1);
+            
             games.computeIfPresent(gameId, (id, game) -> {
                 synchronized (game) {
                     if (game.getState() != GameState.CLASH_ROLL_INIT) {
@@ -459,10 +466,11 @@ public class GameService {
                         }
                     }
                     this.publishGameUpdate(gameId);
+                    result.set(0, player.getInitiative());
                     return game;
                 }
             });
-            return player.getInitiative();
+            return result.get(0);
         }
         return -1;
     }
