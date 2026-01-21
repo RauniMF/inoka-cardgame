@@ -281,15 +281,59 @@ public class GameService {
         return result.get(0);
     }
 
+    /**
+     * Handles transitioning GameState for a Game after CLASH_CONCLUDED.
+     * This includes checking for alternative win conditions.
+     * 
+     * <p>Win Condition Priority:
+     * 1. Three Sacred Stones: Handled by {@code processClashDecision()}
+     * 2. Last Player Standing: If only 1 player has any cards in their hand at the start
+     * of a clash, they win (regardless of sacred stone count)
+     * 3. Most Sacred Stones: If no players have cards remaining at the start of a clash,
+     * the player with the most stones wins (with no tie breakers)
+     * </p>
+     * 
+     * <p> If no win condition is met, the default behavior of proceeding to
+     * DRAWING_CARDS is done, clearing cards from play prior to starting a new clash.
+     * </p>
+     * 
+     * <p>Proper determination of player finishing placement and more in-depth
+     * win condition logic is handled by PodiumView DTO after the game reaches FINISHED.
+     * </p>
+     * @param gameId Game UUID
+     * @return {@code boolean} True if state successfully transitioned, False otherwise
+     */
     public boolean startNewClash(String gameId) {
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
         games.computeIfPresent(gameId, (id, game) -> {
             synchronized (game) {
                 if (game.getState() == GameState.CLASH_CONCLUDED) {
-                        game.setState(GameState.DRAWING_CARDS);
                         // Remove cards from play
                         game.removeAllCardsFromPlay();
+                    
+                        // Check for win conditions
+                        List<Player> players = new ArrayList<>(game.getPlayers().values());
+                        int playersWithCards = 0;
+
+                        for (Player player : players) {
+                            if (player.getDeckSize() > 0) {
+                                playersWithCards += 1;
+                            }
+                        }
+
+                        // Win Condition #2: Only 1 player has cards remaining
+                        if (playersWithCards == 1) {
+                            game.setState(GameState.FINISHED);
+                        }
+                        // Win Condition #3: No players with cards remaining
+                        else if (playersWithCards == 0) {
+                            game.setState(GameState.FINISHED);
+                        }
+                        // Default
+                        else {
+                            game.setState(GameState.DRAWING_CARDS);
+                        }
                         result.set(0, true);
                         this.publishGameUpdate(gameId);
                     }
@@ -334,6 +378,13 @@ public class GameService {
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
                 synchronized (game) {
+                    if (
+                        game.getState() != GameState.DRAWING_CARDS &&
+                        game.getState() != GameState.CLASH_PLAYER_REPLACING_CARD
+                    ) {
+                        return game;
+                    }
+                    
                     Player playerTransient = game.getPlayer(player.getId());
                     game.addCardInPlay(playerId, card);
                     playerTransient.removeCardFromDeck(card);
@@ -381,6 +432,10 @@ public class GameService {
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
                 synchronized (game) {
+                    if (game.getState() != GameState.CLASH_ROLL_INIT) {
+                        return game;
+                    }
+                    
                     // Players cannot share an existing initiative value
                     do {
                         Player playerTransient = game.getPlayer(player.getId());
@@ -614,8 +669,14 @@ public class GameService {
             String gameId = player.getGameId();
             games.computeIfPresent(gameId, (id, game) -> {
                 synchronized (game) {
+                    if (
+                        !game.getCardsInPlay().containsKey(playerId) &&
+                        !((game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD) ||
+                        (game.getState() == GameState.CLASH_PLAYER_TURN))
+                    ) {
+                        return game;
+                    }
                     // Remove card in play
-                    if (!game.getCardsInPlay().containsKey(playerId) && !(game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD)) return game;
                     game.removeCardInPlay(playerId);
                     // Handle initiative order
                     // Forfeit during turn: remove from order then update lastAction

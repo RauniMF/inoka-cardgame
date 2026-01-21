@@ -34,6 +34,8 @@
           - Modify Game/GameView to assign players with empty usernames name = 'Player {player.seat}' to identify players who didn't assign themselves a username (DONE)
      - HTTPS
      - Rate Limiting
+     - Handle removing concluded and inactive Game objects from the game mapping in GameService
+     - Inactivity detection
 
 > Implement front end
 - Get page setup for basic implementation
@@ -50,6 +52,7 @@
      - Show players who are ready (DONE)
      - Game starts when at least 2 players are ready (Done)
            - **Route to game page** (Done)
+- Inactivity detection
 
 > Game flow
 - Only player Id, name and game Id will be kept on the database.
@@ -73,11 +76,10 @@
                - **Display player chose to forfeit on front-end**
      - Winning a clash: Be the last card standing. Winner receives a sacred stone (Done)
 - Process by game state
-      - Display each opponent's sacred stone count
-      - Display user's sacred stone count
       - Conclude game (finishing screen w/ players ranked by stones obtained)
       - Route back to front page after cleaning up game
 - Develop each game state
+     - **Configure 'soft' delay on frontend where visuals aren't automatically updated by the websocket after a CLASH_PROCESSING_DECISION**
 - Option to leave lobby / game
 - Add timer to player action with default option if no input
 
