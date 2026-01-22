@@ -31,7 +31,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.springframework.web.bind.annotation.PutMapping;
 
@@ -52,17 +51,6 @@ public class GameController {
         this.playerService = playerService;
         this.gameService = gameService;
         this.jwtUtil = jwtUtil;
-    }
-
-    // @GetMapping("/player/all")
-    /**
-     * @deprecated Mapping disabled.
-     */
-    @Deprecated
-    public ResponseEntity<List<PlayerEntry>> getAllPlayers() {
-        List<Player> players = playerService.findAllPlayers();
-        List<PlayerEntry> pEntries = players.stream().map(PlayerEntry::new).collect(Collectors.toList());
-        return ResponseEntity.ok(pEntries);
     }
     
     @GetMapping("/player/find")
@@ -141,16 +129,6 @@ public class GameController {
     
         boolean removed = playerService.removePlayerById(principal.getUserId());
         return removed ? new ResponseEntity<>(HttpStatus.OK) : new ResponseEntity<>(HttpStatus.NOT_FOUND);
-    }
-
-    // @DeleteMapping("/player/remove/all")
-    /**
-     * @deprecated Mapping disabled.
-     */
-    @Deprecated
-    public ResponseEntity<?> removeAllPlayers() {
-        playerService.removeAllPlayers();
-        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @GetMapping("/player/card/all")
@@ -252,21 +230,42 @@ public class GameController {
         }
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
-    
+
+    /**
+     * Called by the frontend on the /lobby page, setting GameState to DRAWING_CARDS
+     * and routing to /game page
+     * @param id UUID of Game
+     * @return {@code ResponseEntity} with status code 200 if GameState was set to DRAWING_CARDS,
+     * returns with status code 409 CONFLICT otherwise.
+     */
     @PutMapping(value = "/game/start", consumes = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<?> startGame(@RequestBody String id) {
         boolean result = gameService.setGameStart(id);
         return result ? new ResponseEntity<>(HttpStatus.OK) : new ResponseEntity<>(HttpStatus.CONFLICT);
     }
 
+    /**
+     * @deprecated Clash start handled via WebSocket.
+     * Kept for manual testing
+     * @param id
+     * @return
+     */
     @PutMapping(value = "/game/clash/start", consumes = MediaType.TEXT_PLAIN_VALUE)
+    @Deprecated
     public ResponseEntity<?> startClash(@RequestBody String id) {
         boolean result = gameService.setClashStart(id);
         if (result) return new ResponseEntity<>(HttpStatus.OK);
         return ResponseEntity.status(403).body("Unable to set GameState to CLASH_ROLL_INIT.");
     }
 
+    /**
+     * @deprecated Clash processing handled via WebSocket.
+     * Kept for manual testing
+     * @param id
+     * @return
+     */
     @PutMapping(value = "/game/clash/processed", consumes = MediaType.TEXT_PLAIN_VALUE)
+    @Deprecated
     public ResponseEntity<?> clashProcessed(@RequestBody String id) {
         boolean result = gameService.setClashFinishedProcessing(id);
         if (result) return new ResponseEntity<>(HttpStatus.OK);
@@ -284,32 +283,6 @@ public class GameController {
         int result = gameService.rollInitForPlayer(player.getId());
         if (result == -1) return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         return ResponseEntity.ok(result);
-    }
-
-    @DeleteMapping("/player/cardInPlay")
-    public ResponseEntity<?> removeCardInPlay(@AuthenticationPrincipal PlayerPrincipal principal) {
-        if (principal == null) {
-            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
-        }
-    
-        Player player = principal.getPlayer();
-
-        boolean result = gameService.removePlayerCardInPlay(player.getId());
-        if (result) return new ResponseEntity<>(HttpStatus.OK);
-        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-    }
-
-    @PutMapping("/player/wonClash")
-    public ResponseEntity<?> playerWonClash(@AuthenticationPrincipal PlayerPrincipal principal) {
-        if (principal == null) {
-            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
-        }
-    
-        Player player = principal.getPlayer();
-
-        boolean result = gameService.playerWonClash(player.getId());
-        if (result) return new ResponseEntity<>(HttpStatus.OK);
-        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
     @GetMapping("/player/seat")

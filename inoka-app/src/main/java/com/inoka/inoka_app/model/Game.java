@@ -28,6 +28,7 @@ public class Game {
     private Map<String, Integer> playerSeats;
     private AtomicInteger nextSeat;
     private long clashProcessingTimestamp;
+    private long lastActivityTimestamp;
     
     public Game() {
         this.id = UUID.randomUUID().toString();
@@ -42,6 +43,7 @@ public class Game {
         this.playerSeats = new HashMap<>();
         this.nextSeat = new AtomicInteger(1);
         this.clashProcessingTimestamp = 0;
+        this.lastActivityTimestamp = System.currentTimeMillis();
     }
 
     public Game(String passcode) {
@@ -57,6 +59,7 @@ public class Game {
         this.playerSeats = new HashMap<>();
         this.nextSeat = new AtomicInteger(1);
         this.clashProcessingTimestamp = 0;
+        this.lastActivityTimestamp = System.currentTimeMillis();
     }
 
     public String getId() {
@@ -294,5 +297,12 @@ public class Game {
     }
     public long getClashProcessingTimestamp() {
         return this.clashProcessingTimestamp;
+    }
+
+    public long getLastActivityTimestamp() {
+        return this.lastActivityTimestamp;
+    }
+    public void setLastActivityTimestamp(long timestamp) {
+        this.lastActivityTimestamp = timestamp;
     }
 }

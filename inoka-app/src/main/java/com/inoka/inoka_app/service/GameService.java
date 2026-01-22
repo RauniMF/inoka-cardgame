@@ -1,5 +1,6 @@
 package com.inoka.inoka_app.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
@@ -7,7 +8,6 @@ import org.springframework.stereotype.Service;
 import com.inoka.inoka_app.event.DeckUpdateEvent;
 import com.inoka.inoka_app.event.GameUpdateEvent;
 import com.inoka.inoka_app.model.Player;
-
 import jakarta.annotation.PostConstruct;
 
 import com.inoka.inoka_app.model.Action;
@@ -30,6 +30,18 @@ public class GameService {
     private final ApplicationEventPublisher eventPublisher;
     // Transient game data stored in HashMap
     private final ConcurrentHashMap<String, Game> games = new ConcurrentHashMap<>();;
+
+    @Value("${game.inactivity.timeout-ms}")
+    private long inactivityTimeoutMs;
+
+    @Value("${game.cleanup.timeout-ms}")
+    private long cleanupTimeoutMs;
+
+    @Value("${game.clash.processing-delay}")
+    private long classProcessDelayMs;
+
+    @Value("${game.scheduler.check-interval-ms}")
+    private long schedulerCheckIntervalMs;
 
     public GameService(PlayerService playerService, ApplicationEventPublisher eventPublisher) {
         this.playerService = playerService;
@@ -55,21 +67,45 @@ public class GameService {
         scheduler.initialize();
         scheduler.scheduleAtFixedRate(
             this::checkAndAdvanceClashDecisions,
-            Duration.ofMillis(500)
+            Duration.ofMillis(schedulerCheckIntervalMs)
         );
     }
     private void checkAndAdvanceClashDecisions() {
         long now = System.currentTimeMillis();
-        long CLASH_PROCESS_DELAY_MS = 1000;
         for (Game game : games.values()) {
-            if (game.getState() == GameState.CLASH_PROCESSING_DECISION) {
-                if (now - game.getClashProcessingTimestamp() >= CLASH_PROCESS_DELAY_MS) {
-                    this.processClashDecision(game.getId());
+            synchronized (game) {
+                // Advance clash processing state timer
+                if (game.getState() == GameState.CLASH_PROCESSING_DECISION) {
+                    if (now - game.getClashProcessingTimestamp() >= classProcessDelayMs) {
+                        this.processClashDecision(game.getId());
+                    }
+                }
+                // Inactive players timer
+                if (
+                    game.getState() == GameState.DRAWING_CARDS ||
+                    game.getState() == GameState.CLASH_PLAYER_TURN ||
+                    game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD
+                ) {
+                    if (now - game.getLastActivityTimestamp() >= inactivityTimeoutMs) {
+                        this.resolveInactivePlayerAction(game.getId());
+                    }
+                }
+                // Finished game cleanup timer
+                if (game.getState() == GameState.FINISHED) {
+                    if (now - game.getLastActivityTimestamp() >= cleanupTimeoutMs) {
+                        this.removeFinishedGame(game.getId());
+                    }
                 }
             }
+            
         }
     }
     
+
+    // =====================================================
+    // CRUD Methods
+    // =====================================================
+
     public void addGame(Game game) {
         games.put(game.getId(), game);
     }
@@ -197,6 +233,32 @@ public class GameService {
     }
 
     /**
+     * Removes a Game in GameState.FINISHED from memory
+     * and resets Player game ID
+     * @param gameId Game UUID to remove
+     */
+    public void removeFinishedGame(String gameId) {
+        Optional<Game> gameOpt = this.getGameById(gameId);
+        if (
+            gameOpt.isPresent() &&
+            gameOpt.get().getState() == GameState.FINISHED
+        ) {
+            Game game = games.remove(gameId);
+            for (Player player : game.getPlayers().values()) {
+                if (player.getGameId() == game.getId()) {
+                    player.setGameId("Not in game");
+                    this.playerService.savePlayer(player);
+                }
+            }
+        }
+    }
+
+
+    // =====================================================
+    // Player Action Methods
+    // =====================================================
+
+    /**
      * Given a player's UUID, set the corresponding Player object's {@code isReady} attribute
      * stored in the transient Game data to True
      * @param playerId Player UUID
@@ -225,6 +287,7 @@ public class GameService {
 
     /**
      * Given the UUID of a game, check if all players in a game are ready to start match
+     * TODO: Revisit check for allPlayersReady in frontend to improve application responsiveness
      * @param gameID Game UUID
      * @return {@code Optional<Boolean>} Optional.empty if gameId is invalid,
      * returns True if all players in game are ready, False otherwise
@@ -242,6 +305,288 @@ public class GameService {
     }
 
     /**
+     * Given the UUID of a player and a Card object,
+     * add the card to the Map of cards in play.
+     * Also handles GameState changes from {@code DRAWING_CARDS} to {@code COUNT_DOWN},
+     * as well as {@code CLASH_PLAYER_REPLACING_CARD} to {@code CLASH_PLAYER_TURN}
+     * @param playerId Player UUID
+     * @param card Card object to put in play
+     * @return {@code boolean} True if input playerId points to existing Player, False otherwise
+     */
+    public boolean putCardInPlay(String playerId, Card card) {
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
+
+            String gameId = player.getGameId();
+            final List<Boolean> result = new ArrayList<>(1);
+            result.add(false);
+            
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    if (
+                        game.getState() != GameState.DRAWING_CARDS &&
+                        game.getState() != GameState.CLASH_PLAYER_REPLACING_CARD
+                    ) {
+                        return game;
+                    }
+                    
+                    Player playerTransient = game.getPlayer(player.getId());
+                    game.addCardInPlay(playerId, card);
+                    playerTransient.removeCardFromDeck(card);
+                    /*
+                     * If all players have put a card in play,
+                     * and game is currently in the DRAWING_CARDS state,
+                     * Set state to COUNT_DOWN
+                     */
+                    if (game.getState() == GameState.DRAWING_CARDS) {
+                        if (game.getCardsInPlay().size() == game.getPlayers().size()) {
+                            game.setState(GameState.COUNT_DOWN);
+                        }
+                    }
+                    /*
+                     * If a player's previous card got defeated in clash,
+                     * and they put another card in play,
+                     * update GameState from CLASH_PLAYER_REPLACING_CARD
+                     * to CLASH_PLAYER_TURN, updating initiative value
+                     */
+                    if (game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD) {
+                        game.determineNextInitiativeValue();
+                        game.setState(GameState.CLASH_PLAYER_TURN);
+                        // Start timer for next player to take action
+                        game.setLastActivityTimestamp(System.currentTimeMillis());
+                    }
+                    this.publishGameUpdate(gameId);
+                    this.publishDeckUpdate(player);
+                    result.set(0, true);
+                    return game;
+                }
+            });
+            return result.get(0);
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Rolls unique initiative value for player with input playerId in transient Game object
+     * @param playerId Player UUID
+     * @return {@code int} value rolled for initiative if successful, or -1 otherwise
+     */
+    public int rollInitForPlayer(String playerId) {
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
+
+            String gameId = player.getGameId();
+            final List<Integer> result = new ArrayList<>(1);
+            result.add(-1);
+            
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    if (game.getState() != GameState.CLASH_ROLL_INIT) {
+                        return game;
+                    }
+                    
+                    // Players cannot share an existing initiative value
+                    do {
+                        Player playerTransient = game.getPlayer(player.getId());
+                        playerTransient.rollInitiative();
+                        Card playerCardInPlay = game.getPlayerCardInPlay(playerId);
+                        // Tricksters add their level to initiative when put in play
+                        if (playerCardInPlay != null && playerCardInPlay.getStyle() == CardStyle.TRICKSTER) {
+                            playerTransient.addToInitiative(playerCardInPlay.getLevel());
+                        }
+                        player.setInitiative(playerTransient.getInitiative());
+                    } while (!game.addPlayerInitiativeToMap(player));
+                    /*
+                     * If all players have rolled initiative,
+                     * and game is currently in CLASH_ROLL_INIT state,
+                     * set state to CLASH_PLAYER_TURN
+                     */
+                    if (game.getState() == GameState.CLASH_ROLL_INIT) {
+                        if (game.getInitiativeMap().size() == game.getPlayers().size()) {
+                            game.setState(GameState.CLASH_PLAYER_TURN);
+                            // Start timer for next player to take action
+                            game.setLastActivityTimestamp(System.currentTimeMillis());
+                            game.determineNextInitiativeValue();
+                        }
+                    }
+                    this.publishGameUpdate(gameId);
+                    result.set(0, player.getInitiative());
+                    return game;
+                }
+            });
+            return result.get(0);
+        }
+        return -1;
+    }
+
+    /**
+     * On {@code Game.state == CLASH_PLAYER_TURN}, given the input UUID of a player taking action
+     * and the UUID of the player they chose to take action against, or "null" if that player
+     * chose to skip their turn, deal damage and/or change GameState to {@code CLASH_PROCESSING_DECISION}
+     * @param dealingPlayerId Dealing Player UUID
+     * @param receivingPlayerId Receiving Player UUID
+     * @return {@code int} damage dealt to receiving Player's Card, -1 if no damage dealt.
+     */
+    public int resolveClashAction(String dealingPlayerId, String receivingPlayerId) {
+        Optional<Player> playerOpt = this.playerService.findPlayerById(dealingPlayerId);
+        final List<Integer> result = new ArrayList<>(1);
+        result.add(-1);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    // Guard: only allow actions during CLASH_PLAYER_TURN
+                    if (game.getState() != GameState.CLASH_PLAYER_TURN) {
+                        return game;
+                    }
+
+                    int damage = -1;
+                    if (!receivingPlayerId.equals("null")) {
+                        // Deal damage
+                        damage = game.dealDamage(dealingPlayerId, receivingPlayerId);
+                        result.set(0, damage);
+                    } 
+                    
+                    game.setLastAction(dealingPlayerId, receivingPlayerId, result.get(0));
+                    game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    game.setProcessingTimestamp(System.currentTimeMillis());
+                    this.publishGameUpdate(gameId);
+                    return game;
+                }
+            });
+        }
+        return result.get(0);
+    }
+
+    /**
+     * @deprecated Remove after confirming forfeit / card removal
+     * work during CLASH_PLAYER_TURN
+     * @param playerId
+     * @return
+     */
+    @Deprecated
+    public boolean removePlayerCardInPlay(String playerId) {
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    // If card not present, no-op
+                    if (!game.getCardsInPlay().containsKey(playerId)) {
+                        return game;
+                    }
+                    
+                    Card removedCard = game.removeCardInPlay(playerId);
+                    if (removedCard != null) {
+                        result.set(0, true);
+                        // Note: State transitions now handled in resolveClashAction
+                        // This method is kept for legacy/explicit removal if needed
+                        if (game.getState() == GameState.CLASH_PROCESSING_DECISION) {
+                            game.setState(GameState.CLASH_PLAYER_REPLACING_CARD);
+                        }
+                        this.publishGameUpdate(gameId);
+                    }
+                    return game;
+                }
+            });
+        }
+        return result.get(0);
+    }
+
+    /**
+     * Given a player's UUID,
+     * discard their card in play
+     * and remove them from the initiative order
+     */
+    public void playerForfeitClash(String playerId) {
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    if (
+                        !game.getCardsInPlay().containsKey(playerId) &&
+                        !((game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD) ||
+                        (game.getState() == GameState.CLASH_PLAYER_TURN))
+                    ) {
+                        return game;
+                    }
+                    // Remove card in play
+                    game.removeCardInPlay(playerId);
+                    // Handle initiative order
+                    // Forfeit during turn: remove from order then update lastAction
+                    game.removePlayerFromInitiative(player);
+                    // Update game state & last action
+                    game.setLastAction("null", playerId, -1);
+                    game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    game.setProcessingTimestamp(System.currentTimeMillis());
+                    this.publishGameUpdate(gameId);
+                    return game;
+                }
+            });
+        }
+    }
+
+    /**
+     * Resolves inactive player to default behavior.
+     * <p>Behavior depends on GameState:
+     * - {@code DRAWING_CARDS}: Select first card from player's hand to put in play
+     * - {@code CLASH_PLAYER_TURN}: Skip player's turn
+     * - {@code CLASH_PLAYER_REPLACING_CARD}: Player forfeits clash
+     * </p>
+     * @param gameId Game UUID
+     */
+    void resolveInactivePlayerAction(String gameId) {
+        games.computeIfPresent(gameId, (id, game) -> {
+            synchronized (game) {
+                if (game.getState() == GameState.DRAWING_CARDS) {
+                    for (Player player : game.getPlayers().values()) {
+                        if (
+                            !game.getCardsInPlay().containsKey(player.getId()) &&
+                            player.getDeckSize() > 0
+                        ) {
+                            Card firstCard = player.getDeck().get(0);
+                            this.putCardInPlay(player.getId(), firstCard);
+                        }
+                    }
+                }
+                else if (game.getState() == GameState.CLASH_PLAYER_TURN) {
+                    String currentPlayerId = game.getInitiativeMap().get(game.getCurrentInitiativeValue());
+                    if (currentPlayerId != null) {
+                        this.resolveClashAction(currentPlayerId, "null");
+                    }
+                }
+                else if (game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD) {
+                    for (String playerId : game.getInitiativeMap().values()) {
+                        if (!game.getCardsInPlay().containsKey(playerId)) {
+                            this.playerForfeitClash(playerId);
+                            break;
+                        }
+                    }
+                }
+                return game;
+            }
+        });
+    }
+
+
+    // =====================================================
+    // State Management Methods
+    // =====================================================
+
+    /**
      * Given the UUID of a game, set the GameState to DRAWING_CARDS if conditions are met
      * @param gameId Game UUID
      * @return {@code boolean} True if Game object was set to DRAWING_CARDS, False otherwise
@@ -253,6 +598,8 @@ public class GameService {
             synchronized (game) {
                 if (game.getState() == GameState.WAITING_FOR_PLAYERS && this.allPlayersReady(gameId).get()) {
                     game.setState(GameState.DRAWING_CARDS);
+                    // Start timer for players to put a card in play
+                    game.setLastActivityTimestamp(System.currentTimeMillis());
                     result.set(0, true);
                     this.publishGameUpdate(gameId);
                 }
@@ -262,6 +609,12 @@ public class GameService {
         return result.get(0);
     }
 
+    /**
+     * Called by the frontend to process to CLASH_ROLL_INIT
+     * from COUNT_DOWN
+     * @param gameId UUID of Game
+     * @return {@code boolean} if GameState is successfully changed to CLASH_ROLL_INIT
+     */
     public boolean setClashStart(String gameId) {
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
@@ -325,14 +678,20 @@ public class GameService {
                         // Win Condition #2: Only 1 player has cards remaining
                         if (playersWithCards == 1) {
                             game.setState(GameState.FINISHED);
+                            // Start timer for game cleanup
+                            game.setLastActivityTimestamp(System.currentTimeMillis());
                         }
                         // Win Condition #3: No players with cards remaining
                         else if (playersWithCards == 0) {
                             game.setState(GameState.FINISHED);
+                            // Start timer for game cleanup
+                            game.setLastActivityTimestamp(System.currentTimeMillis());
                         }
                         // Default
                         else {
                             game.setState(GameState.DRAWING_CARDS);
+                            // Start timer for players to put a card in play
+                            game.setLastActivityTimestamp(System.currentTimeMillis());
                         }
                         result.set(0, true);
                         this.publishGameUpdate(gameId);
@@ -343,6 +702,13 @@ public class GameService {
         return result.get(0);
     }
 
+    /**
+     * @deprecated Never called through the frontend.
+     * Kept for manual testing via REST call
+     * @param gameId
+     * @return
+     */
+    @Deprecated
     public boolean setClashFinishedProcessing(String gameId) {
         final List<Boolean> result = new ArrayList<>(1);
         result.add(false);
@@ -358,193 +724,6 @@ public class GameService {
                 return game;
             }
         });
-        return result.get(0);
-    }
-
-    /**
-     * Given the UUID of a player and a Card object,
-     * add the card to the Map of cards in play.
-     * Also handles GameState changes from {@code DRAWING_CARDS} to {@code COUNT_DOWN},
-     * as well as {@code CLASH_PLAYER_REPLACING_CARD} to {@code CLASH_PLAYER_TURN}
-     * @param playerId Player UUID
-     * @param card Card object to put in play
-     * @return {@code boolean} True if input playerId points to existing Player, False otherwise
-     */
-    public boolean putCardInPlay(String playerId, Card card) {
-        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
-        if (playerOpt.isPresent()) {
-            Player player = playerOpt.get();
-
-            String gameId = player.getGameId();
-            final List<Boolean> result = new ArrayList<>(1);
-            result.add(false);
-            
-            games.computeIfPresent(gameId, (id, game) -> {
-                synchronized (game) {
-                    if (
-                        game.getState() != GameState.DRAWING_CARDS &&
-                        game.getState() != GameState.CLASH_PLAYER_REPLACING_CARD
-                    ) {
-                        return game;
-                    }
-                    
-                    Player playerTransient = game.getPlayer(player.getId());
-                    game.addCardInPlay(playerId, card);
-                    playerTransient.removeCardFromDeck(card);
-                    /*
-                     * If all players have put a card in play,
-                     * and game is currently in the DRAWING_CARDS state,
-                     * Set state to COUNT_DOWN
-                     */
-                    if (game.getState() == GameState.DRAWING_CARDS) {
-                        if (game.getCardsInPlay().size() == game.getPlayers().size()) {
-                            game.setState(GameState.COUNT_DOWN);
-                        }
-                    }
-                    /*
-                     * If a player's previous card got defeated in clash,
-                     * and they put another card in play,
-                     * update GameState from CLASH_PLAYER_REPLACING_CARD
-                     * to CLASH_PLAYER_TURN, updating initiative value
-                     */
-                    if (game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD) {
-                        game.setState(GameState.CLASH_PLAYER_TURN);
-                        game.determineNextInitiativeValue();
-                    }
-                    this.publishGameUpdate(gameId);
-                    this.publishDeckUpdate(player);
-                    result.set(0, true);
-                    return game;
-                }
-            });
-            return result.get(0);
-        } else {
-            return false;
-        }
-    }
-
-    /**
-     * Rolls unique initiative value for player with input playerId in transient Game object
-     * @param playerId Player UUID
-     * @return {@code int} value rolled for initiative if successful, or -1 otherwise
-     */
-    public int rollInitForPlayer(String playerId) {
-        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
-        if (playerOpt.isPresent()) {
-            Player player = playerOpt.get();
-
-            String gameId = player.getGameId();
-            final List<Integer> result = new ArrayList<>(1);
-            result.add(-1);
-            
-            games.computeIfPresent(gameId, (id, game) -> {
-                synchronized (game) {
-                    if (game.getState() != GameState.CLASH_ROLL_INIT) {
-                        return game;
-                    }
-                    
-                    // Players cannot share an existing initiative value
-                    do {
-                        Player playerTransient = game.getPlayer(player.getId());
-                        playerTransient.rollInitiative();
-                        Card playerCardInPlay = game.getPlayerCardInPlay(playerId);
-                        // Tricksters add their level to initiative when put in play
-                        if (playerCardInPlay != null && playerCardInPlay.getStyle() == CardStyle.TRICKSTER) {
-                            playerTransient.addToInitiative(playerCardInPlay.getLevel());
-                        }
-                        player.setInitiative(playerTransient.getInitiative());
-                    } while (!game.addPlayerInitiativeToMap(player));
-                    /*
-                     * If all players have rolled initiative,
-                     * and game is currently in CLASH_ROLL_INIT state,
-                     * set state to CLASH_PLAYER_TURN
-                     */
-                    if (game.getState() == GameState.CLASH_ROLL_INIT) {
-                        if (game.getInitiativeMap().size() == game.getPlayers().size()) {
-                            game.setState(GameState.CLASH_PLAYER_TURN);
-                            game.determineNextInitiativeValue();
-                        }
-                    }
-                    this.publishGameUpdate(gameId);
-                    result.set(0, player.getInitiative());
-                    return game;
-                }
-            });
-            return result.get(0);
-        }
-        return -1;
-    }
-
-    /**
-     * On {@code Game.state == CLASH_PLAYER_TURN}, given the input UUID of a player taking action
-     * and the UUID of the player they chose to take action against, or "null" if that player
-     * chose to skip their turn, deal damage and/or change GameState to {@code CLASH_PROCESSING_DECISION}
-     * @param dealingPlayerId Dealing Player UUID
-     * @param receivingPlayerId Receiving Player UUID
-     * @return {@code int} damage dealt to receiving Player's Card, -1 if no damage dealt.
-     */
-    public int resolveClashAction(String dealingPlayerId, String receivingPlayerId) {
-        Optional<Player> playerOpt = this.playerService.findPlayerById(dealingPlayerId);
-        final List<Integer> result = new ArrayList<>(1);
-        result.add(-1);
-        if (playerOpt.isPresent()) {
-            Player player = playerOpt.get();
-
-            String gameId = player.getGameId();
-            games.computeIfPresent(gameId, (id, game) -> {
-                synchronized (game) {
-                    // Guard: only allow actions during CLASH_PLAYER_TURN
-                    if (game.getState() != GameState.CLASH_PLAYER_TURN) {
-                        return game;
-                    }
-
-                    int damage = -1;
-                    if (!receivingPlayerId.equals("null")) {
-                        // Deal damage
-                        damage = game.dealDamage(dealingPlayerId, receivingPlayerId);
-                        result.set(0, damage);
-                    } 
-                    
-                    game.setLastAction(dealingPlayerId, receivingPlayerId, result.get(0));
-                    game.setState(GameState.CLASH_PROCESSING_DECISION);
-                    game.setProcessingTimestamp(System.currentTimeMillis());
-                    this.publishGameUpdate(gameId);
-                    return game;
-                }
-            });
-        }
-        return result.get(0);
-    }
-
-    public boolean removePlayerCardInPlay(String playerId) {
-        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
-        final List<Boolean> result = new ArrayList<>(1);
-        result.add(false);
-        if (playerOpt.isPresent()) {
-            Player player = playerOpt.get();
-
-            String gameId = player.getGameId();
-            games.computeIfPresent(gameId, (id, game) -> {
-                synchronized (game) {
-                    // If card not present, no-op
-                    if (!game.getCardsInPlay().containsKey(playerId)) {
-                        return game;
-                    }
-                    
-                    Card removedCard = game.removeCardInPlay(playerId);
-                    if (removedCard != null) {
-                        result.set(0, true);
-                        // Note: State transitions now handled in resolveClashAction
-                        // This method is kept for legacy/explicit removal if needed
-                        if (game.getState() == GameState.CLASH_PROCESSING_DECISION) {
-                            game.setState(GameState.CLASH_PLAYER_REPLACING_CARD);
-                        }
-                        this.publishGameUpdate(gameId);
-                    }
-                    return game;
-                }
-            });
-        }
         return result.get(0);
     }
     
@@ -602,6 +781,8 @@ public class GameService {
                             if (sacredStones == 3) {
                                 // 3 stones needed to win
                                 game.setState(GameState.FINISHED);
+                                // Start timer for game cleanup
+                                game.setLastActivityTimestamp(System.currentTimeMillis());
                             }
                             else {
                                 game.setState(GameState.CLASH_CONCLUDED);
@@ -612,12 +793,16 @@ public class GameService {
                             game.resetCardsTotem();
                             game.playerGiveTotem(dealingPlayerId);
                             game.setState(GameState.CLASH_PLAYER_REPLACING_CARD);
+                            // Start timer for player to replace card
+                            game.setLastActivityTimestamp(System.currentTimeMillis());
                         }
                     }
                     else {
                         // No knockout, continue in turn order
                         game.determineNextInitiativeValue();
                         game.setState(GameState.CLASH_PLAYER_TURN);
+                        // Start timer for next player to take action
+                        game.setLastActivityTimestamp(System.currentTimeMillis());
                     }
                 }
                 // Dealing player exists & receivingPlayerId == "null" -> Player skipped
@@ -627,6 +812,8 @@ public class GameService {
                 ) {
                     game.determineNextInitiativeValue();
                     game.setState(GameState.CLASH_PLAYER_TURN);
+                    // Start timer for next player to take action
+                    game.setLastActivityTimestamp(System.currentTimeMillis());
                 }
                 // dealingPlayerId == "null" & receiving player exists -> Player forfeit
                 else if (
@@ -645,6 +832,8 @@ public class GameService {
                         if (sacredStones == 3) {
                             // 3 stones needed to win
                             game.setState(GameState.FINISHED);
+                            // Start timer for game cleanup
+                            game.setLastActivityTimestamp(System.currentTimeMillis());
                         }
                         else {
                             game.setState(GameState.CLASH_CONCLUDED);
@@ -654,6 +843,8 @@ public class GameService {
                         // More than 1 player remains active in the clash, continue
                         game.determineNextInitiativeValue();
                         game.setState(GameState.CLASH_PLAYER_TURN);
+                        // Start timer for next player to take action
+                        game.setLastActivityTimestamp(System.currentTimeMillis());
                     }
                 }
 
@@ -664,47 +855,11 @@ public class GameService {
     }
 
     /**
-     * Given a player's UUID,
-     * discard their card in play
-     * and remove them from the initiative order
+     * @deprecated Remove soon.
+     * @param playerId
+     * @return
      */
-    public void playerForfeitClash(String playerId) {
-        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
-        
-        if (playerOpt.isPresent()) {
-            Player player = playerOpt.get();
-
-            String gameId = player.getGameId();
-            games.computeIfPresent(gameId, (id, game) -> {
-                synchronized (game) {
-                    if (
-                        !game.getCardsInPlay().containsKey(playerId) &&
-                        !((game.getState() == GameState.CLASH_PLAYER_REPLACING_CARD) ||
-                        (game.getState() == GameState.CLASH_PLAYER_TURN))
-                    ) {
-                        return game;
-                    }
-                    // Remove card in play
-                    game.removeCardInPlay(playerId);
-                    // Handle initiative order
-                    // Forfeit during turn: remove from order then update lastAction
-                    game.removePlayerFromInitiative(player);
-                    // Update game state & last action
-                    game.setLastAction("null", playerId, -1);
-                    game.setState(GameState.CLASH_PROCESSING_DECISION);
-                    game.setProcessingTimestamp(System.currentTimeMillis());
-                    this.publishGameUpdate(gameId);
-                    return game;
-                }
-            });
-        }
-    }
-
-    /**
-     * Given a player's UUID,
-     * verify that they've won the clash,
-     * then award them if they won
-     */
+    @Deprecated
     public boolean playerWonClash(String playerId) {
         Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
         final List<Boolean> result = new ArrayList<>(1);

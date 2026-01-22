@@ -68,15 +68,6 @@ public class GameWebSocketController {
         gameService.startNewClash(gameId);
     }
 
-    @MessageMapping("/clashProcessed")
-    public void handleClashProcessed(@Payload String gameId, Principal principal) {
-        if (principal == null) {
-            logger.warn("Unauthorized clash processed attempt");
-            return;
-        }
-        gameService.setClashFinishedProcessing(gameId);
-    }
-
     @MessageMapping("/playCard")
     public void handlePlayCard(@Payload Card card, Principal principal) {
         if (principal == null) {

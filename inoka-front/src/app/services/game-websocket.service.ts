@@ -100,15 +100,6 @@ export class GameWebSocketService {
         }
     }
 
-    clashProcessed(gameId: string): void {
-        if (this.stompClient && this.stompClient.connected) {
-            this.stompClient.publish({
-                destination: "/app/clashProcessed",
-                body: gameId
-            })
-        }
-    }
-
     playCard(card: Card): void {
         if (this.stompClient && this.stompClient.connected) {
             this.stompClient.publish({
