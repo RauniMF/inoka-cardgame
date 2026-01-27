@@ -11,6 +11,11 @@ public enum GameState {
      */
     WAITING_FOR_PLAYERS,
     /**
+     * The {@code ALL_PLAYERS_READY} state, like the {@code WAITING_FOR_PLAYERS} state, is only used in the Game lobby.
+     * <p> It indicates that all players in the lobby are ready. The backend will automatically transition to DRAWING_CARDS after a short delay. </p>
+     */
+    ALL_PLAYERS_READY,
+    /**
      * When a game starts (i.e. all players in the lobby have signalled that they are ready), it is set to {@code DRAWING_CARDS}
      * <p> This indicates that players are currently choosing which card to put into play from their hand at the start of the clash </p>
      */

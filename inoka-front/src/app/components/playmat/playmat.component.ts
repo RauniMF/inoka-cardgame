@@ -485,7 +485,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
       this.selectedCard = null;
     }
 
-    if (this.game?.initiativeMap != undefined && this.selectedCard == null) {
+    if (!this.handSuppressed && this.selectedCard == null) {
       this.gameStatus.set("Put a new card in play? Or forfeit clash?");
     }
     else {

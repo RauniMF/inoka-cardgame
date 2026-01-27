@@ -47,6 +47,7 @@ public class GameWebSocketController {
         }
         
         String authenticatedUserId = principal.getName();
+        gameService.updatePlayerActivity(authenticatedUserId);
         gameService.setPlayerReady(authenticatedUserId);
     }
 
@@ -76,6 +77,7 @@ public class GameWebSocketController {
         }
         
         String playerId = principal.getName();
+        gameService.updatePlayerActivity(playerId);
         gameService.putCardInPlay(playerId, card);
     }
 
@@ -112,6 +114,7 @@ public class GameWebSocketController {
          *  resolveClashAction() -> dealingPlayer damages receivingPlayer
          *  if receivingPlayerId == "null", dealingPlayer skips turn
          */
+        gameService.updatePlayerActivity(dealingPlayerId);
         gameService.resolveClashAction(
             dealingPlayerId,
             receivingPlayerIdOpt.isPresent() ? receivingPlayerIdOpt.get()
@@ -127,6 +130,7 @@ public class GameWebSocketController {
         }
         
         String playerId = principal.getName();
+        gameService.updatePlayerActivity(playerId);
         gameService.playerForfeitClash(playerId);
     }
 }

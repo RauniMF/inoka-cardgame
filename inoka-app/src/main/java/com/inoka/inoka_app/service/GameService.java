@@ -43,6 +43,12 @@ public class GameService {
     @Value("${game.scheduler.check-interval-ms}")
     private long schedulerCheckIntervalMs;
 
+    @Value("${game.all-players-ready-delay}")
+    private long allPlayersReadyDelayMs;
+
+    @Value("${game.inactivity-kick.timeout-ms}")
+    private long kickInactivityTimeoutMs;
+
     public GameService(PlayerService playerService, ApplicationEventPublisher eventPublisher) {
         this.playerService = playerService;
         this.eventPublisher = eventPublisher;
@@ -80,7 +86,24 @@ public class GameService {
                         this.processClashDecision(game.getId());
                     }
                 }
-                // Inactive players timer
+                // Advance lobby players all ready timer
+                if (game.getState() == GameState.ALL_PLAYERS_READY) {
+                    if (now - game.getClashProcessingTimestamp() >= allPlayersReadyDelayMs) {
+                        this.setGameStart(game.getId());
+                    }
+                }
+                // Inactive players timers - Lobby
+                if (game.getState() == GameState.WAITING_FOR_PLAYERS) {
+                    for (Player player : game.getPlayers().values()) {
+                        if (!player.isReady()) {
+                            Long joinTime = game.getPlayerLastActivityTimestamp(player.getId());
+                            if (joinTime != null && (now - joinTime) >= inactivityTimeoutMs) {
+                                this.removePlayerFromGame(player.getId());
+                            }
+                        }
+                    }
+                }
+                // Inactive players timer - In Game
                 if (
                     game.getState() == GameState.DRAWING_CARDS ||
                     game.getState() == GameState.CLASH_PLAYER_TURN ||
@@ -211,6 +234,7 @@ public class GameService {
         games.computeIfPresent(gameId, (id, game) -> {
             synchronized (game) {
                 game.addPlayer(player);
+                game.updatePlayerLastActivityTimestamp(player.getId());
                 this.playerService.savePlayer(player);
                 this.publishGameUpdate(gameId);
                 return game;
@@ -258,6 +282,21 @@ public class GameService {
     // Player Action Methods
     // =====================================================
 
+    public void updatePlayerActivity(String playerId) {
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
+            String gameId = player.getGameId();
+
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    game.updatePlayerLastActivityTimestamp(playerId);
+                    return game;
+                }
+            });
+        }
+    }
+
     /**
      * Given a player's UUID, set the corresponding Player object's {@code isReady} attribute
      * stored in the transient Game data to True
@@ -275,6 +314,14 @@ public class GameService {
                 synchronized (game) {
                     Player playerTransient = game.getPlayer(player.getId());
                     playerTransient.setReady(true);
+                    
+                    // Check if all players are ready
+                    boolean allReady = this.allPlayersReady(gameId).get();
+                    if (allReady && game.numPlayers() >= 2) {
+                        game.setState(GameState.ALL_PLAYERS_READY);
+                        game.setProcessingTimestamp(System.currentTimeMillis());
+                    }
+                    
                     this.publishGameUpdate(gameId);
                     return game;
                 }
@@ -580,6 +627,83 @@ public class GameService {
             }
         });
     }
+    
+    /**
+     * Removes a player from a game and handles cleanup.
+     * <p> Handles:
+     * - Removal from all game data structures (players, initiative, cardsInPlay, lastActivity)
+     * - Resetting player gameId
+     * - Checking if game should end (1 player remaining)
+     * - Checking if game should be removed (0 players remaining)
+     * - Recalculating readiness if in lobby states
+     * </p>
+     * @param playerId Player UUID to remove
+     * @return
+     */
+    public boolean removePlayerFromGame(String playerId) {
+        final List<Boolean> result = new ArrayList<>(1);
+        result.add(false);
+
+        Optional<Player> playerOpt = this.playerService.findPlayerById(playerId);
+        
+        if (playerOpt.isPresent()) {
+            Player player = playerOpt.get();
+
+            String gameId = player.getGameId();
+            games.computeIfPresent(gameId, (id, game) -> {
+                synchronized (game) {
+                    if (!game.getPlayers().containsKey(playerId)) {
+                        return game;
+                    }
+
+                    Optional<Player> updatedPlayerOpt = game.removePlayer(playerId);
+                    if (updatedPlayerOpt.isEmpty()) {
+                        return game;
+                    }
+
+                    this.playerService.savePlayer(updatedPlayerOpt.get());
+
+                    int remainingPlayers = game.numPlayers();
+
+                    if (remainingPlayers == 0) {
+                        // No players left, mark for game removal
+                        result.set(0, true);
+                        return null; // remove game from map
+                    }
+                    else if (remainingPlayers == 1) {
+                        // Only 1 player left, game ends
+                        game.setState(GameState.FINISHED);
+                        game.setLastActivityTimestamp(System.currentTimeMillis());
+                        this.publishGameUpdate(gameId);
+                        result.set(0, true);
+                        return game;
+                    }
+                    else {
+                        // 2+ players remaining, handle based on state
+                        if (
+                            game.getState() == GameState.WAITING_FOR_PLAYERS ||
+                            game.getState() == GameState.ALL_PLAYERS_READY
+                        ) {
+                            boolean allReady = this.allPlayersReady(gameId).get();
+                            if (allReady && remainingPlayers >= 2) {
+                                game.setState(GameState.ALL_PLAYERS_READY);
+                                game.setLastActivityTimestamp(System.currentTimeMillis());
+                            }
+                            else {
+                                game.setState(GameState.WAITING_FOR_PLAYERS);
+                            }
+                        }
+
+                        this.publishGameUpdate(gameId);
+                        result.set(0, true);
+                        return game;
+                    }
+                }
+            });
+        }
+
+        return result.get(0);
+    }
 
 
     // =====================================================
@@ -596,11 +720,20 @@ public class GameService {
         result.add(false);
         games.computeIfPresent(gameId, (id, game) -> {
             synchronized (game) {
-                if (game.getState() == GameState.WAITING_FOR_PLAYERS && this.allPlayersReady(gameId).get()) {
+                int numPlayers = game.numPlayers();
+                if (game.getState() == GameState.ALL_PLAYERS_READY && numPlayers >= 2) {
                     game.setState(GameState.DRAWING_CARDS);
                     // Start timer for players to put a card in play
                     game.setLastActivityTimestamp(System.currentTimeMillis());
+                    // All player activity refreshed
+                    for (String playerId : game.getPlayers().keySet()) {
+                        game.updatePlayerLastActivityTimestamp(playerId);
+                    }
                     result.set(0, true);
+                    this.publishGameUpdate(gameId);
+                }
+                else if (numPlayers < 2) {
+                    game.setState(GameState.WAITING_FOR_PLAYERS);
                     this.publishGameUpdate(gameId);
                 }
                 return game;

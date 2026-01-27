@@ -160,6 +160,22 @@ public class GameController {
         return ResponseEntity.ok(game.getId());
     }
 
+    @DeleteMapping("/game/leave")
+    public ResponseEntity<?> leaveGame(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
+        Player player = principal.getPlayer();
+
+        if (gameService.removePlayerFromGame(player.getId())) {
+            return new ResponseEntity<>(HttpStatus.OK);
+        }
+        else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
     @GetMapping("/game/find")
     public ResponseEntity<GameView> findGame(@AuthenticationPrincipal PlayerPrincipal principal) {
         if (principal == null) {
@@ -213,6 +229,7 @@ public class GameController {
     
         Player player = principal.getPlayer();
 
+        gameService.updatePlayerActivity(player.getId());
         boolean success = gameService.setPlayerReady(player.getId());
         if (success) {
             return ResponseEntity.noContent().build();
@@ -307,7 +324,7 @@ public class GameController {
     }
 
     @GetMapping("/game/podium")
-    public ResponseEntity<PodiumView> getMethodName(@AuthenticationPrincipal PlayerPrincipal principal) {
+    public ResponseEntity<PodiumView> getPodium(@AuthenticationPrincipal PlayerPrincipal principal) {
         if (principal == null) {
             return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }
