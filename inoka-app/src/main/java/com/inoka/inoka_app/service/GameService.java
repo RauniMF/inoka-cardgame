@@ -670,7 +670,11 @@ public class GameService {
                         result.set(0, true);
                         return null; // remove game from map
                     }
-                    else if (remainingPlayers == 1) {
+                    else if (
+                        remainingPlayers == 1 &&
+                        game.getState() != GameState.WAITING_FOR_PLAYERS &&
+                        game.getState() != GameState.ALL_PLAYERS_READY
+                    ) {
                         // Only 1 player left, game ends
                         game.setState(GameState.FINISHED);
                         game.setLastActivityTimestamp(System.currentTimeMillis());

@@ -111,7 +111,8 @@ public class Game {
             this.removePlayerFromInitiative(playerTransient);
             this.cardsInPlay.remove(playerId);
             this.playerLastActivityTimestamps.remove(playerId);
-            playerTransient.setGameId("Not in game.");
+            playerTransient.setReady(false);
+            playerTransient.setGameId("Not in game");
             this.players.put(playerId, playerTransient);
         }
         return Optional.ofNullable(this.players.remove(playerId));

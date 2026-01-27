@@ -4,6 +4,7 @@ import { Player } from "./player";
 
 export enum GameState {
     WAITING_FOR_PLAYERS = "WAITING_FOR_PLAYERS",
+    ALL_PLAYERS_READY = "ALL_PLAYERS_READY",
     DRAWING_CARDS = "DRAWING_CARDS",
     COUNT_DOWN = "COUNT_DOWN",
     CLASH_ROLL_INIT = "CLASH_ROLL_INIT",

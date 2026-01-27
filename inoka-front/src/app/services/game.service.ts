@@ -146,9 +146,14 @@ export class GameService {
     }
 
     // Player joins game and updates BehaviorSubject
-    public createGame(passcode: string = ""): void {
-        const currentPlayer = this.playerSubject.value;
-        if (currentPlayer && currentPlayer.id) {
+    public createGame(passcode: string = ""): Observable<void> {
+        return new Observable(observer => {
+            const currentPlayer = this.playerSubject.value;
+            if (!currentPlayer || !currentPlayer.id) {
+                observer.error("No player found.");
+                return;
+            }
+
             let httpObservable: Observable<string>;
             if (passcode === "") {
                 httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create`, null, { responseType: 'text' as 'json' });
@@ -163,10 +168,15 @@ export class GameService {
                     // INFO:
                     // console.log('Joined game with id=', gameId);
                     this.handleWS(currentPlayer);
+                    observer.next();
+                    observer.complete();
                 },
-                error: (e) => console.error("Failed to create game: ", e)
+                error: (e) => {
+                    console.error("Failed to create game: ", e)
+                    observer.error(e);
+                }
             });
-        }
+        });
     }
 
     // Receive existing game object
@@ -204,5 +214,9 @@ export class GameService {
 
     public getPlayerSeat(): Observable<number> {
         return this.http.get<number>(`${this.apiServerUrl}/player/seat`);
+    }
+
+    public leaveGame(): Observable<void> {
+        return this.http.delete<void>(`${this.apiServerUrl}/game/leave`);
     }
 }

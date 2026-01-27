@@ -42,14 +42,6 @@ h2 {
     overflow: hidden;
 }
 
-.ready-button {
-    align-self: center;
-    font-size: 1vw;
-    height: auto;
-    width: 15%;
-    margin: 1rem 0;
-}
-
 .entry-position {
     font-size: 1.5vw;
     margin: 1%;
@@ -85,4 +77,18 @@ h2 {
 .position-6 {
     grid-row: 3;
     grid-column: 2;
+}
+
+.user-buttons {
+    width: 100%;
+    display: grid;
+    grid-template-areas: "a b";
+}
+
+.user-buttons > button {
+    align-self: center;
+    font-size: 1vw;
+    height: auto;
+    width: 60%;
+    margin: 1rem 0;
 }

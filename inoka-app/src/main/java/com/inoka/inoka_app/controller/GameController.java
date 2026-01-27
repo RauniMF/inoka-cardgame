@@ -59,6 +59,15 @@ public class GameController {
             return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }
         Player player = principal.getPlayer();
+        if (!player.getGameId().equals("Not in game")) {
+            // Return from Game object to include up-to-date transient data
+            Optional<Game> gameOpt = gameService.getGameById(player.getGameId());
+            if (gameOpt.isPresent()) {
+                Game game = gameOpt.get();
+
+                player = game.getPlayer(player.getId());
+            }
+        }
         return ResponseEntity.ok(new PlayerEntry(player));
     }
 

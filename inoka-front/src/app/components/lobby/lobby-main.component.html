@@ -11,6 +11,9 @@
                 </div>
             }
         </div>
-        <button class="ready-button" (click)="toggleReady()">Ready Up</button>
+        <div class="user-buttons">
+            <button class="ready-button" [attr.disabled]="this.player?.ready ? true : null" (click)="toggleReady()">Ready Up</button>
+            <button class="leave-button" (click)="leaveGame()">Leave Game</button>
+        </div>
     </div>
 </div>
