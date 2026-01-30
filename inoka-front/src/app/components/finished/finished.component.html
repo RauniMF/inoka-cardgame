@@ -1,0 +1,29 @@
+<div class="podium-container">
+    <h1>Game Results</h1>
+
+    <div class="podium-view">
+    @if (top3Entries().length > 0) {
+        @for (entry of top3Entries(); track entry.player.seat; let index = $index) {
+        <div class="player-position" [ngClass]="'position-' + (index + 1)">
+            <div class="podium-placement">
+                <p> {{ entry.player.name }} <span class="small">({{ entry.sacredStones }} stones)</span> </p>
+                <h2>{{ entry.placement }}</h2>
+            </div>
+        </div>
+        }    
+    }
+    @else {
+        <p> Could not load </p>
+    }
+    </div>
+    <div class="side-view">
+    @if (lowerEntries().length > 0) {
+        <li>
+            @for (entry of lowerEntries(); track entry.player.seat) {
+            <ul>{{ entry.placement }}. {{ entry.player.name }} {{ entry.sacredStones }}</ul>
+            }
+        </li>
+    }    
+    </div>
+
+</div>

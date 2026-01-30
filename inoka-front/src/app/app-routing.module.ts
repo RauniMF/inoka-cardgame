@@ -20,6 +20,12 @@ const routes: Routes = [
     loadComponent: () => {
       return import('./components/playmat/playmat.component').then((m) => m.PlaymatComponent)
     }
+  },
+  {
+    path: 'game/finished',
+    loadComponent: () => {
+      return import('./components/finished/finished.component').then((m) => m.FinishedComponent);
+    },
   }
 ];
 

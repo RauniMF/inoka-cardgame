@@ -1,6 +1,6 @@
 main, html, body {
-    height: calc(100% - 16px);
-    min-height: calc(100vh - 16px);
+    height: 100%;
+    min-height: 100%;
     margin: 0;
     padding: 0;
     overflow: hidden;

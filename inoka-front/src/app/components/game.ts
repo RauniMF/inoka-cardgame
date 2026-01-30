@@ -58,3 +58,13 @@ export interface ActionView {
     receivingSeat?: number;
     damageDealt: number;
 }
+
+export interface PodiumEntry {
+    placement: number;
+    players: PlayerView[];
+    sacredStones: number;
+}
+
+export interface PodiumView {
+    entries: PodiumEntry[];
+}

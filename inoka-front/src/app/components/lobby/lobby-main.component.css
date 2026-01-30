@@ -85,10 +85,17 @@ h2 {
     grid-template-areas: "a b";
 }
 
-.user-buttons > button {
+.user-buttons > span {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.user-buttons > span > button {
     align-self: center;
     font-size: 1vw;
     height: auto;
-    width: 60%;
-    margin: 1rem 0;
+    width: 40%;
+    margin: 1rem 4px;
 }

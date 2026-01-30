@@ -8,6 +8,7 @@ import { Player } from '../player';
 import { CommonModule } from '@angular/common';
 import { ActionView, Game, GameState, GameView, PlayerView } from '../game';
 import { GameWebSocketService } from '../../services/game-websocket.service';
+import { Router } from '@angular/router';
 
 type DropdownData = [number, number, boolean];
 
@@ -42,6 +43,7 @@ export class PlaymatComponent implements OnInit, OnDestroy {
   
   private gameService = inject(GameService);
   private gameWebSocketService = inject(GameWebSocketService);
+  private router = inject(Router);
 
   ngOnInit(): void {
     this.gameService.getPlayerSeat().subscribe({
@@ -204,6 +206,9 @@ export class PlaymatComponent implements OnInit, OnDestroy {
         break;
       case GameState.CLASH_CONCLUDED:
         await this.handleClashConcluded();
+        break;
+      case GameState.FINISHED:
+        this.handleGameFinished();
         break;
     }
   }
@@ -518,5 +523,19 @@ export class PlaymatComponent implements OnInit, OnDestroy {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private handleGameFinished(): void {
+    this.gameStatus.set("Game Over");
+
+    this.gameService.getPodium().subscribe({
+      next: (p) => {
+        this.router.navigate(['/game/finished'], { state: { podiumView: p }});
+      },
+      error: (e) => {
+        console.error('Failed to fetch podium data: ', e);
+        this.router.navigate(['/']);
+      }
+    });
   }
 }

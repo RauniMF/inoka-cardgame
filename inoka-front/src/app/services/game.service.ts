@@ -3,7 +3,7 @@ import { Injectable } from "@angular/core";
 import { BehaviorSubject, Observable } from "rxjs"
 import { Player } from "../components/player";
 import { Card } from "../components/card";
-import { Game, GameView } from "../components/game";
+import { Game, GameView, PodiumView } from "../components/game";
 import { GameWebSocketService } from "./game-websocket.service";
 
 @Injectable({
@@ -218,5 +218,9 @@ export class GameService {
 
     public leaveGame(): Observable<void> {
         return this.http.delete<void>(`${this.apiServerUrl}/game/leave`);
+    }
+
+    public getPodium(): Observable<PodiumView> {
+        return this.http.get<PodiumView>(`${this.apiServerUrl}/game/podium`);
     }
 }
