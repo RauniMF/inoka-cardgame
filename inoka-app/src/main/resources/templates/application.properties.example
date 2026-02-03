@@ -1,0 +1,52 @@
+spring.application.name=inoka_app
+
+# ===========================================
+# MySQL Configuration
+# ===========================================
+# For local development (non-Docker):
+#   1. Install MySQL locally
+#   2. Create database: CREATE DATABASE playerdb;
+#   3. Update credentials below
+#
+# For Docker Compose:
+#   Environment variables override these values automatically.
+#   See docker-compose.yml and .env.example
+spring.datasource.url=jdbc:mysql://localhost:3306/playerdb
+spring.datasource.username=CHANGE_ME_your_username
+spring.datasource.password=CHANGE_ME_your_password
+
+# JPA/Hibernate Configuration
+spring.jpa.show-sql=true
+spring.jpa.hibernate.ddl-auto=update
+spring.jackson.default-property-inclusion=always
+
+# ===========================================
+# JWT Configuration
+# ===========================================
+# Generate a secure 64-character hex secret:
+#   openssl rand -hex 32
+#
+# IMPORTANT: Never commit your actual JWT secret to Git!
+jwt.secret=CHANGE_ME_generate_with_openssl_rand_hex_32
+jwt.expiration=86400000
+
+# ===========================================
+# Logging Configuration
+# ===========================================
+logging.level.root=INFO
+logging.level.com.inoka.inoka_app=DEBUG
+logging.level.com.inoka.inoka_app.controller.GameWebSocketController=DEBUG
+logging.level.com.inoka.inoka_app.security.JwtWebSocketInterceptor=DEBUG
+logging.level.org.springframework.web.socket=DEBUG
+logging.level.org.springframework.messaging=DEBUG
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} - %msg%n
+
+# ===========================================
+# Game Scheduler Configuration
+# ===========================================
+game.inactivity.timeout-ms=120000
+game.cleanup.timeout-ms=600000
+game.clash.processing-delay=1000
+game.scheduler.check-interval-ms=500
+game.all-players-ready-delay=5000
+game.inactivity-kick.timeout-ms=300000

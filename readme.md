@@ -1,90 +1,230 @@
-# Card Game Web App
+# Inoka - Card and Dice Game Web Application
 
-A card-and-dice game developed using Spring Boot and Angular. This project is in its early stages and consists of a front-end and back-end, located in the `inoka-front` and `inoka-app` directories, respectively. Below are instructions to set up and run the application locally.
-
----
-
-## Table of Contents
-1. [Prerequisites](#prerequisites)
-2. [Setup Instructions](#setup-instructions)
-    - [Database Setup](#database-setup)
-    - [Back-End Setup](#back-end-setup)
-    - [Front-End Setup](#front-end-setup)
-3. [Running the Application](#running-the-application)
+A full-stack card-and-dice game developed using **Spring Boot** (backend) and **Angular** (frontend). This project demonstrates modern web application development with real-time gameplay using WebSockets.
 
 ---
 
-## Prerequisites
+## Quick Start with Docker (Recommended)
 
-Ensure you have the following installed on your system:
-- [Node.js](https://nodejs.org/) (for the front-end)
-- [MySQL](https://www.mysql.com/) (for the database)
-- [Java JDK](https://www.oracle.com/java/technologies/javase-downloads.html) (for the back-end)
-- [Gradle](https://gradle.org/) (for building the back-end)
+The fastest way to demo the application is using Docker Compose, which automatically sets up the database and application.
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
+- No need for Node.js, MySQL, or Java installed locally!
+
+### Steps
+
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd inoka
+   ```
+
+2. **Configure environment variables**
+   ```bash
+   # Copy the example environment file
+   cp .env.example .env
+   
+   # Edit .env and update the CHANGE_ME values
+   # At minimum, change these:
+   #   - DB_USERNAME
+   #   - DB_PASSWORD
+   #   - MYSQL_ROOT_PASSWORD
+   #   - JWT_SECRET (generate with: openssl rand -hex 32)
+   ```
+
+   **Example .env:**
+   ```bash
+   DB_USERNAME=inoka_user
+   DB_PASSWORD=SecurePass123!
+   MYSQL_ROOT_PASSWORD=RootPass456!
+   JWT_SECRET=4ef43e621e52963bfada0b3060aa902d74991a9e898b3e32cba763611a45a14e
+   ```
+
+3. **Start the application**
+   ```bash
+   docker-compose up
+   ```
+
+   The first time will take 5-10 minutes to build. Subsequent starts are much faster.
+
+4. **Access the application**
+   - Open your browser and navigate to: **http://localhost:8080**
+   - The Angular frontend is served by the Spring Boot backend
+
+5. **Stop the application**
+   ```bash
+   # Press Ctrl+C in the terminal, then:
+   docker-compose down
+   ```
 
 ---
 
-## Setup Instructions
+## Build from Source (Development Setup)
+
+If you want to develop or modify the application, follow these instructions to run it locally without Docker.
+
+### Prerequisites
+
+Ensure you have the following installed:
+- [Node.js](https://nodejs.org/) (v18+)
+- [MySQL](https://www.mysql.com/) (v8.0+)
+- [Java JDK](https://www.oracle.com/java/technologies/javase-downloads.html) (v21)
+- [Gradle](https://gradle.org/) (or use included Gradle wrapper)
+
+---
 
 ### Database Setup
-1. Install and start MySQL.
-2. Create a new database:
-    ```sql
-    CREATE DATABASE playerdb;
-    ```
 
-### Back-End Setup
-1. Navigate to the `inoka-app` directory:
-    ```bash
-    cd inoka-app
-    ```
-2. Create and configure the `application.properties` file located in `src/main/resources`:
-    ```properties
-    spring.application.name=inoka_app
-    # MySQL Config
-    spring.datasource.url=jdbc:mysql://localhost:3306/playerdb
-    # Configure local MySQL user information
-    spring.datasource.username= 
-    spring.datasource.password=
-    spring.jpa.show-sql=true
-    spring.jpa.hibernate.ddl-auto=update
-    spring.jackson.default-property-inclusion=always
-    ```
-    > Note: For JWT authentication, jwt.secret and jwt.expiration must also be configured.
+1. **Install and start MySQL**
 
-3. Build the back-end:
-    ```bash
-    gradle build
-    ```
-4. Start the back-end server:
-    ```bash
-    gradle bootRun
-    ```
+2. **Create the database**
+   ```sql
+   CREATE DATABASE playerdb;
+   ```
 
-### Front-End Setup
-1. Navigate to the `inoka-front` directory:
-    ```bash
-    cd inoka-front
-    ```
-2. Install dependencies:
-    ```bash
-    npm install
-    ```
-3. Start the front-end application:
-    ```baseh
-    ng serve --open
-    ```
+3. **Create application user** (optional but recommended)
+   ```sql
+   CREATE USER 'inoka_user'@'localhost' IDENTIFIED BY 'your_password';
+   GRANT ALL PRIVILEGES ON playerdb.* TO 'inoka_user'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
 
 ---
 
-## Running the Application
+### Back-End Setup
 
-1. Ensure the back-end server is running (`http://localhost:8080` by default).
-3. Open your browser and navigate to `http://localhost:4200` to access the application.
+1. **Navigate to the backend directory**
+   ```bash
+   cd inoka-app
+   ```
+
+2. **Configure application properties**
+   ```bash
+   # Copy the example file
+   cp src/main/resources/templates/application.properties.example \
+      src/main/resources/application.properties
+   ```
+
+3. **Edit `application.properties`**
+   
+   Update these values in `src/main/resources/application.properties`:
+   ```properties
+   # MySQL Configuration
+   spring.datasource.url=jdbc:mysql://localhost:3306/playerdb
+   spring.datasource.username=inoka_user
+   spring.datasource.password=your_password
+   
+   # JWT Configuration (generate with: openssl rand -hex 32)
+   jwt.secret=your_64_character_hex_secret_here
+   jwt.expiration=86400000
+   ```
+
+4. **Build the backend**
+   ```bash
+   ./gradlew build
+   ```
+
+5. **Start the backend server**
+   ```bash
+   ./gradlew bootRun
+   ```
+   
+   Backend runs on **http://localhost:8080**
+
+---
+
+### Front-End Setup
+
+1. **Navigate to the frontend directory** (in a new terminal)
+   ```bash
+   cd inoka-front
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Start the development server**
+   ```bash
+   npm start
+   # or
+   ng serve --open
+   ```
+   
+   Frontend runs on **http://localhost:4200**
+
+---
+
+## Project Structure 📁 
+
+```
+inoka/
+├── inoka-app/              # Spring Boot backend
+│   ├── src/main/java/      # Java source code
+│   ├── src/main/resources/ # Configuration files
+│   └── build.gradle        # Gradle build configuration
+├── inoka-front/            # Angular frontend
+│   ├── src/app/            # Angular components & services
+│   ├── package.json        # NPM dependencies
+│   └── angular.json        # Angular configuration
+├── Dockerfile              # Multi-stage Docker build
+├── docker-compose.yaml     # Docker Compose configuration
+├── .env.example            # Environment variables template
+└── README.md               # This file
+```
+
+---
+
+## Running Tests
+
+### Backend Tests
+```bash
+cd inoka-app
+./gradlew test
+```
+
+### Frontend Tests
+
+Note: Frontend tests have not been implemented yet.
+
+```bash
+cd inoka-front
+npm test
+```
 
 ---
 
 ## Notes
-- This project is in its early stages, so expect potential bugs or incomplete features.
 
----  
+- This project is in active development - expect bugs and incomplete features
+- The application uses WebSockets for real-time gameplay synchronization
+- Frontend Angular app is served by Spring Boot in production (Docker) mode
+- For development, run frontend and backend separately on ports 4200 and 8080
+
+---
+
+## Technologies Used
+
+### Backend
+- Spring Boot 3.5.8
+- Spring Security (JWT authentication)
+- Spring WebSocket (STOMP)
+- Spring Data JPA
+- MySQL 8.0
+- Java 21
+
+### Frontend
+- Angular 19.2.1
+- TypeScript 5.5.2
+- RxJS 7.8.0
+- SockJS + STOMP.js (WebSocket client)
+
+### DevOps
+- Docker & Docker Compose
+- Multi-stage builds
+- Gradle build system
+- NPM package manager
+
+---
