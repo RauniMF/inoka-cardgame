@@ -16,8 +16,8 @@ The fastest way to demo the application is using Docker Compose, which automatic
 
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
-   cd inoka
+   git clone https://github.com/RauniMF/inoka-cardgame.git
+   cd inoka-cardgame
    ```
 
 2. **Configure environment variables**
