@@ -6,7 +6,7 @@ import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { PlayerEntryComponent } from './player-entry/player-entry.component';
 import { GameWebSocketService } from '../../services/game-websocket.service';
-import { GameView, PlayerView } from '../game';
+import { GameState, GameView, PlayerView } from '../game';
 
 @Component({
   selector: 'app-lobby-main',
@@ -27,7 +27,8 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
   private playerSubscription: Subscription | null = null;
   private gameSubscription: Subscription | null = null;
 
-  private startingFlag: boolean = true;
+  // Prevents automatically routing upon receiving GameState.DRAWING_CARDS when countdown is active
+  private preventRouting: boolean = false;
 
   ngOnInit(): void {
     this.fetchPlayers();
@@ -59,19 +60,23 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
                 if (this.game) {
                   this.players = Array.isArray(this.game.playerViews) ? this.game.playerViews : Object.values(this.game.playerViews);
                   console.log("Players loaded: ", this.players);
-                  this.updateLobbyStatus();
+                  this.onStateChange(this.game?.state!);
                 }
               }
             },
             error: (e) => {
               if (e.status === 404) {
                 console.log("Player not in game.");
+                this.router.navigate(['/']);
               }
               else {
                 console.log("Error fetching Game details: ", e);
               }
             }
           });
+        }
+        else if (this.player?.gameId && this.player.gameId === 'Not in game') {
+          this.router.navigate(['/'])
         }
       },
       error: (e) => console.error(`Could not fetch player data in lobby-main: `, e)
@@ -85,47 +90,30 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
           // INFO:
           // console.log("Game loaded from WebSocket: ", gameUpdate);
           this.players = Array.isArray(gameUpdate.playerViews) ? gameUpdate.playerViews : Object.values(gameUpdate.playerViews);
-          this.updateLobbyStatus();
+          this.onStateChange(this.game?.state!);
         }
       },
       error: (e) => console.log("Could not fetch Game data in lobby-main: ", e)
     });
   }
 
-  /*
-   * Responsible for:
-   * Updating the lobbyStatus text
-   * Starting the game when all players are ready
-   */
-  updateLobbyStatus(): void {
-    if (this.players.length < 2) {
-        this.lobbyStatus.set("Waiting for players");
-        return;
+  private onStateChange(state: GameState): void {
+    switch(state) {
+      case GameState.ALL_PLAYERS_READY:
+        this.startGameCooldown();
+        break;
+      case GameState.DRAWING_CARDS:
+        if (!this.preventRouting) this.router.navigate(['/game']);
+        break;
+      case GameState.WAITING_FOR_PLAYERS:
+        if (this.players.length < 2) {
+          this.lobbyStatus.set("Waiting for players");
+        }
+        else {
+          this.lobbyStatus.set("Waiting for all players to be ready...");
+        }
+        break;
     }
-
-    /*
-     * Check if all players are ready
-     * This is done on the game's side in the back-end
-     * As we don't store isReady in the Player.ts class 
-    */
-    if (this.player?.gameId && this.player.gameId !== 'Not in game') {
-      const gameId = this.player.gameId;
-      this.gameService.allPlayersReady(gameId).subscribe({
-        next: (r) => {
-          const allReady = r;
-          if (allReady && this.startingFlag) this.startGameCooldown(gameId);
-          else this.lobbyStatus.set("Waiting for all players to be ready...");
-        },
-        error: (e) => console.error(`Game id:${gameId} error returning player ready status: `, e)
-
-      });
-    }
-    else {
-        // TODO - Handle error detection
-        console.error(`Player "${this.player?.name}", id:${this.player?.id} could not update lobby status in lobby-main: Not in game.`);
-        return;
-    }
-
   }
 
   /*
@@ -134,19 +122,39 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
    */
   toggleReady(): void {
     if (this.player?.id) {
+      this.player.ready = true;
       this.gameService.setPlayerReady().subscribe({
-        next: (r) => {
-          this.updateLobbyStatus();
-        },
-        error: (e) => console.error(`Player "${this.player?.name}", id:${this.player?.id} could not ready: `, e)
+        error: (e) => {
+          this.player!.ready = false;
+          console.error(`Player "${this.player?.name}", id:${this.player?.id} could not ready: `, e)
+        }
       });
     }
   }
+
+  leaveGame(): void {
+    if (this.gameSubscription) {
+      this.gameSubscription.unsubscribe();
+    }
+    
+    this.game = null;
+
+    this.gameService.leaveGame().subscribe({
+      next: () => {
+        this.router.navigate(['/'], { replaceUrl: true });
+      },
+      error: (e) => {
+        console.error('Error leaving game: ', e);
+        // Navigate away anyway
+        this.router.navigate(['/'], { replaceUrl: true });
+      }
+    })
+  }
   
-  startGameCooldown(gameId: string): void {
+  startGameCooldown(): void {
     let count = 5;
     this.lobbyStatus.set(`Game starting in: ${count}`);
-    this.startingFlag = false;
+    this.preventRouting = true;
 
     const interval = setInterval(() => {
       count--;
@@ -156,21 +164,7 @@ export class LobbyMainComponent implements OnInit, OnDestroy {
         clearInterval(interval);
         // Navigate to game page
         this.lobbyStatus.set("Game starting...");
-        this.gameService.startGame(gameId).subscribe({
-          next: () => {
-            console.log("Game starting.");
-            this.router.navigate(["/game"]);
-          },
-          error: (e) => {
-            // 409 Conflict means another player already started the game - this is fine
-            if (e.status === 409) {
-              console.log("Game already started by another player, navigating to game.");
-              this.router.navigate(["/game"]);
-            } else {
-              console.log("Could not start game in lobby-main: ", e);
-            }
-          }
-        });
+        this.router.navigate(["/game"]);
       }
     }, 1000);
   }

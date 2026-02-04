@@ -19,7 +19,7 @@ yarn-error.log
 *.sublime-workspace
 
 # Visual Studio Code
-.vscode/*
+.vscode/
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
@@ -74,6 +74,25 @@ out/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
-.vscode/
+### Docker ###
+.env
+.env.local
+.env.*.local
+*.tar
+*.img
+docker-compose.override.yml
+
+### Application Properties ###
 application.properties
+application-*.properties
+!application.properties.example
+!application.properties.template
+
+### Logs ###
+*.log
+logs/
+
+### Database ###
+*.db
+*.sqlite
+*.sql

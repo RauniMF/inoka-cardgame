@@ -1,0 +1,73 @@
+services:
+  # MySQL Database Service
+  mysql-db:
+    image: mysql:8.0
+    container_name: inoka-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - inoka-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Inoka Full-Stack Application Service
+  inoka-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: inoka:latest
+    container_name: inoka-application
+    restart: unless-stopped
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      
+      # Server Configuration
+      SERVER_PORT: ${SERVER_PORT}
+      
+      # JPA/Hibernate Configuration
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      
+      # Game Configuration (Optional)
+      GAME_INACTIVITY_TIMEOUT_MS: ${GAME_INACTIVITY_TIMEOUT_MS:-120000}
+      GAME_CLEANUP_TIMEOUT_MS: ${GAME_CLEANUP_TIMEOUT_MS:-600000}
+      GAME_CLASH_PROCESSING_DELAY: ${GAME_CLASH_PROCESSING_DELAY:-1000}
+      GAME_SCHEDULER_CHECK_INTERVAL_MS: ${GAME_SCHEDULER_CHECK_INTERVAL_MS:-500}
+      GAME_ALL_PLAYERS_READY_DELAY: ${GAME_ALL_PLAYERS_READY_DELAY:-5000}
+      GAME_INACTIVITY_KICK_TIMEOUT_MS: ${GAME_INACTIVITY_KICK_TIMEOUT_MS:-300000}
+    ports:
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    networks:
+      - inoka-network
+
+# Persistent Volume for MySQL Data
+volumes:
+  mysql-data:
+    driver: local
+
+# Network for Service Communication
+networks:
+  inoka-network:
+    driver: bridge

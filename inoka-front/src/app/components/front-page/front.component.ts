@@ -13,15 +13,13 @@ import { GameWebSocketService } from '../../services/game-websocket.service';
     styleUrl: './front.component.css',
     imports: [UserComponent, QueueComponent]
 })
-  export class FrontPageComponent implements OnInit, OnDestroy {
+  export class FrontPageComponent implements OnInit {
     username: string = '';
     passcode: string = '';
     
     private gameService = inject(GameService);
-    private gameWebSocketService = inject(GameWebSocketService);
     private router = inject(Router);
-    private gameSubscription: Subscription | null = null;
-
+    
     constructor(private cdr: ChangeDetectorRef) {}
     @ViewChild(UserComponent) userComponent!: UserComponent;
     @ViewChild(QueueComponent) queueComponent!: QueueComponent;
@@ -31,22 +29,37 @@ import { GameWebSocketService } from '../../services/game-websocket.service';
     }
 
     ngOnInit(): void {
-      this.gameSubscription = this.gameWebSocketService.gameUpdates$.subscribe(
-        (game: GameView | null) => {
-          if (game == null || game?.state === null) return; // Player is not in game
-
-          switch(game.state) {
-            case GameState.WAITING_FOR_PLAYERS:
-              this.router.navigate(["/lobby"]);
-              break;
-            case GameState.DRAWING_CARDS:
-              this.router.navigate(["/game"]);
+      this.gameService.getGame().subscribe({
+        next: (gameView) => {
+          if (gameView) {
+            console.log('Game loaded: ', gameView);
+            this.handleState(gameView.state);
           }
+        },
+        error: (e) => {
+          console.log("Game not found.");
         }
-      );
+      });
     }
 
-    ngOnDestroy(): void {
-      this.gameSubscription?.unsubscribe();
+    private handleState(state: GameState): void {
+      switch(state) {
+        case GameState.FINISHED:
+          this.gameService.leaveGame();
+          break;
+        case GameState.WAITING_FOR_PLAYERS:
+        case GameState.ALL_PLAYERS_READY:  
+          this.router.navigate(["/lobby"]);
+          break;
+        case GameState.DRAWING_CARDS:
+        case GameState.COUNT_DOWN:
+        case GameState.CLASH_ROLL_INIT:
+        case GameState.CLASH_PLAYER_TURN:
+        case GameState.CLASH_PROCESSING_DECISION:
+        case GameState.CLASH_PLAYER_REPLACING_CARD:
+        case GameState.CLASH_CONCLUDED:
+          this.router.navigate(["/game"]);
+          break;
+      }
     }
   }

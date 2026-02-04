@@ -20,7 +20,7 @@ export class GameWebSocketService {
     constructor(){}
 
     connect(gameId: string): void {
-        const socket = new SockJS('http://localhost:8080/ws');
+        const socket = new SockJS('/ws');
         const token = localStorage.getItem('authToken');
         
         if (!token) {
@@ -95,15 +95,6 @@ export class GameWebSocketService {
         if (this.stompClient && this.stompClient.connected) {
             this.stompClient.publish({
                 destination: "/app/clashNew",
-                body: gameId
-            })
-        }
-    }
-
-    clashProcessed(gameId: string): void {
-        if (this.stompClient && this.stompClient.connected) {
-            this.stompClient.publish({
-                destination: "/app/clashProcessed",
                 body: gameId
             })
         }

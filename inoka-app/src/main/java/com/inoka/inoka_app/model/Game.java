@@ -27,7 +27,27 @@ public class Game {
     // Player UUID --> Associated seat number
     private Map<String, Integer> playerSeats;
     private AtomicInteger nextSeat;
+    /**
+     * Used to process game states after a delay
+     * <p>
+     * - CLASH_PROCESSING_DECISION --> ...
+     * - ALL_PLAYERS_READY --> DRAWING_CARDS
+     * </p>
+     */
     private long clashProcessingTimestamp;
+    /**
+     * Used to time player turns (used to resolve default behavior after timer),
+     * as well as completed game cleanup
+     */
+    private long lastActivityTimestamp;
+    /**
+     * Player UUID --> Last Activity Timestamp (in ms)
+     * <p> 
+     * Used to detect inactivity in /lobby page, 
+     * as well as long term inactivity in game (used to kick inactive players)
+     * </p>
+     */
+    private Map<String, Long> playerLastActivityTimestamps;
     
     public Game() {
         this.id = UUID.randomUUID().toString();
@@ -42,6 +62,8 @@ public class Game {
         this.playerSeats = new HashMap<>();
         this.nextSeat = new AtomicInteger(1);
         this.clashProcessingTimestamp = 0;
+        this.lastActivityTimestamp = System.currentTimeMillis();
+        this.playerLastActivityTimestamps = new HashMap<>();
     }
 
     public Game(String passcode) {
@@ -57,6 +79,8 @@ public class Game {
         this.playerSeats = new HashMap<>();
         this.nextSeat = new AtomicInteger(1);
         this.clashProcessingTimestamp = 0;
+        this.lastActivityTimestamp = System.currentTimeMillis();
+        this.playerLastActivityTimestamps = new HashMap<>();
     }
 
     public String getId() {
@@ -74,6 +98,24 @@ public class Game {
             player.setGameId(this.id);
             this.players.put(player.getId(), player);
         }
+    }
+    /**
+     * Removes Player from all relevant maps and resets Player.gameId
+     * @param playerId
+     * @return
+     */
+    public Optional<Player> removePlayer(String playerId) {
+        if (players.keySet().contains(playerId)) {
+            Player playerTransient = this.players.get(playerId);
+            // Remove from initiative map
+            this.removePlayerFromInitiative(playerTransient);
+            this.cardsInPlay.remove(playerId);
+            this.playerLastActivityTimestamps.remove(playerId);
+            playerTransient.setReady(false);
+            playerTransient.setGameId("Not in game");
+            this.players.put(playerId, playerTransient);
+        }
+        return Optional.ofNullable(this.players.remove(playerId));
     }
     public Map<String, Player> getPlayers() {
         return players;
@@ -294,5 +336,19 @@ public class Game {
     }
     public long getClashProcessingTimestamp() {
         return this.clashProcessingTimestamp;
+    }
+
+    public long getLastActivityTimestamp() {
+        return this.lastActivityTimestamp;
+    }
+    public void setLastActivityTimestamp(long timestamp) {
+        this.lastActivityTimestamp = timestamp;
+    }
+
+    public Long getPlayerLastActivityTimestamp(String playerId) {
+        return this.playerLastActivityTimestamps.get(playerId);
+    }
+    public void updatePlayerLastActivityTimestamp(String playerId) {
+        this.playerLastActivityTimestamps.put(playerId, System.currentTimeMillis());
     }
 }

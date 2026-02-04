@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+README.md
+
+# Build outputs (will be built inside container)
+inoka-app/build/
+inoka-app/bin/
+inoka-app/.gradle/
+inoka-front/dist/
+inoka-front/node_modules/
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Environment files
+.env
+.env.local
+*.properties
+!*.properties.template
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

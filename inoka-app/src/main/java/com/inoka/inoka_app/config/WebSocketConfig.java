@@ -2,6 +2,7 @@ package com.inoka.inoka_app.config;
 
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
@@ -23,6 +24,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     
     private final JwtWebSocketInterceptor jwtWebSocketInterceptor;
     
+    @Value("${websocket.allowed.origins}")
+    private String[] allowedOrigins;
+
     public WebSocketConfig(JwtWebSocketInterceptor jwtWebSocketInterceptor) {
         this.jwtWebSocketInterceptor = jwtWebSocketInterceptor;
     }
@@ -41,7 +45,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(@NonNull StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-            .setAllowedOrigins("http://localhost:4200")
+            .setAllowedOriginPatterns(allowedOrigins)
             .addInterceptors(new HandshakeInterceptor() {
                 @Override
                 public boolean beforeHandshake(@NonNull ServerHttpRequest request, 

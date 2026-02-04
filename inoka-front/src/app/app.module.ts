@@ -18,6 +18,7 @@ import { HandComponent } from './components/playmat/hand/hand.component';
 import { CommonModule } from '@angular/common';
 import { PlayerEntryComponent } from './components/lobby/player-entry/player-entry.component';
 import { authInterceptor } from './services/auth.interceptor';
+import { FinishedComponent } from './components/finished/finished.component';
 
 @NgModule({
   declarations: [
@@ -36,7 +37,8 @@ import { authInterceptor } from './services/auth.interceptor';
     PlayerEntryComponent,
     PlaymatComponent,
     CardComponent,
-    HandComponent
+    HandComponent,
+    FinishedComponent
   ],
   providers: [
     provideHttpClient(withFetch(), withInterceptors([authInterceptor])),

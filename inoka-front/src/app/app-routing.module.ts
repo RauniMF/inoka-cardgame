@@ -20,11 +20,21 @@ const routes: Routes = [
     loadComponent: () => {
       return import('./components/playmat/playmat.component').then((m) => m.PlaymatComponent)
     }
+  },
+  {
+    path: 'game/finished',
+    loadComponent: () => {
+      return import('./components/finished/finished.component').then((m) => m.FinishedComponent);
+    },
+  },
+  {
+    path: '**',
+    redirectTo: ''
   }
 ];
 
 @NgModule({
-  imports: [RouterModule.forRoot(routes)],
+  imports: [RouterModule.forRoot(routes, { useHash: true })],
   exports: [RouterModule]
 })
 export class AppRoutingModule { }

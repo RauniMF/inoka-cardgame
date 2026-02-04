@@ -1,0 +1,20 @@
+# Auto normalize line endings for all projects
+* text=auto
+
+# Shell scripts and Gradle wrapper - Unix line endings
+*.sh text eol=lf
+gradlew text eol=lf
+
+# Batch files - Windows line endings  
+*.bat text eol=crlf
+gradlew.bat text eol=crlf
+
+# Gradle/Java files - Unix line endings
+*.gradle text eol=lf
+*.java text eol=lf
+*.properties text eol=lf
+
+# Angular/TypeScript - Unix line endings
+*.ts text eol=lf
+*.js text eol=lf
+*.json text eol=lf

@@ -3,14 +3,14 @@ import { Injectable } from "@angular/core";
 import { BehaviorSubject, Observable } from "rxjs"
 import { Player } from "../components/player";
 import { Card } from "../components/card";
-import { Game, GameView } from "../components/game";
+import { Game, GameView, PodiumView } from "../components/game";
 import { GameWebSocketService } from "./game-websocket.service";
 
 @Injectable({
     providedIn: 'root' // Ensures a singleton instance across the entire application
 })
 export class GameService {
-    private apiServerUrl = 'http://localhost:8080/inoka';
+    private apiServerUrl = '/inoka';
     private currentGameId: string | null = null;
 
     // BehaviorSubject holds player's data
@@ -113,11 +113,6 @@ export class GameService {
         }
     }
 
-    /** @deprecated Endpoint disabled */
-    public getAllPlayers(): Observable<Player[]> {
-        return this.http.get<Player[]>(`${this.apiServerUrl}/player/all`);
-    }
-
     // Player lookup via principal
     public findPlayer(): Observable<Player> {
         return this.http.get<Player>(`${this.apiServerUrl}/player/find`);
@@ -151,9 +146,14 @@ export class GameService {
     }
 
     // Player joins game and updates BehaviorSubject
-    public createGame(passcode: string = ""): void {
-        const currentPlayer = this.playerSubject.value;
-        if (currentPlayer && currentPlayer.id) {
+    public createGame(passcode: string = ""): Observable<void> {
+        return new Observable(observer => {
+            const currentPlayer = this.playerSubject.value;
+            if (!currentPlayer || !currentPlayer.id) {
+                observer.error("No player found.");
+                return;
+            }
+
             let httpObservable: Observable<string>;
             if (passcode === "") {
                 httpObservable = this.http.post<string>(`${this.apiServerUrl}/game/create`, null, { responseType: 'text' as 'json' });
@@ -168,10 +168,15 @@ export class GameService {
                     // INFO:
                     // console.log('Joined game with id=', gameId);
                     this.handleWS(currentPlayer);
+                    observer.next();
+                    observer.complete();
                 },
-                error: (e) => console.error("Failed to create game: ", e)
+                error: (e) => {
+                    console.error("Failed to create game: ", e)
+                    observer.error(e);
+                }
             });
-        }
+        });
     }
 
     // Receive existing game object
@@ -181,11 +186,6 @@ export class GameService {
 
     public removePlayer(): Observable<void> {
         return this.http.delete<void>(`${this.apiServerUrl}/player/remove`);
-    }
-
-    /** @deprecated Endpoint disabled */
-    public removeAllPlayers(): Observable<void> {
-        return this.http.delete<void>(`${this.apiServerUrl}/player/remove/all`);
     }
 
     public getPlayerDeck(): Observable<Card[]> {
@@ -207,45 +207,20 @@ export class GameService {
     public startGame(gameId: string): Observable<void> {
         return this.http.put<void>(`${this.apiServerUrl}/game/start`, gameId);
     }
-    
-    /** @deprecated Clash start handled by websocket service */
-    public startClash(gameId: string): void {
-        this.http.put<void>(`${this.apiServerUrl}/game/clash/start`, gameId).subscribe({
-            next: () => {},
-            // error: (e) => console.log(e)
-        });
-    }
-
-    /** @deprecated Clash processing handled by websocket service */
-    public clashProcessed(gameId: string): void {
-        const headers = new HttpHeaders().set('Content-Type', 'text/plain');
-        this.http.put<void>(`${this.apiServerUrl}/game/clash/processed`, gameId, { headers, responseType: 'text' as 'json' }).subscribe({
-            next: () => {},
-            // error: (e) => console.log(e)
-        });
-    }
 
     public rollInitForPlayer(): Observable<number> {
         return this.http.get<number>(`${this.apiServerUrl}/player/rollinit`)
     }
 
-    /** @deprecated Server now handles card removal automatically in resolveClashAction. Kept for backward compatibility. */
-    public removeCardInPlay(): void {
-        this.http.delete<void>(`${this.apiServerUrl}/player/cardInPlay`).subscribe({
-            next: () => {},
-            error: (e) => console.error("Error removing card in play: ", e)
-        });
-    }
-
-    /** @deprecated Server now handles clash winner detection automatically. Kept for backward compatibility. */
-    public playerWonClash(): void{
-        this.http.put<void>(`${this.apiServerUrl}/player/wonClash`, null).subscribe({
-            next: () => {},
-            error: (e) => console.error("Error checking if player won: ", e)
-        });
-    }
-
     public getPlayerSeat(): Observable<number> {
         return this.http.get<number>(`${this.apiServerUrl}/player/seat`);
+    }
+
+    public leaveGame(): Observable<void> {
+        return this.http.delete<void>(`${this.apiServerUrl}/game/leave`);
+    }
+
+    public getPodium(): Observable<PodiumView> {
+        return this.http.get<PodiumView>(`${this.apiServerUrl}/game/podium`);
     }
 }

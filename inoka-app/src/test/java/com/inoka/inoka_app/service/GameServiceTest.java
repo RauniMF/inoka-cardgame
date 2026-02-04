@@ -16,6 +16,7 @@ import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 import com.inoka.inoka_app.model.GameView;
 import com.inoka.inoka_app.model.Player;
+import com.inoka.inoka_app.model.PodiumView;
 import com.inoka.inoka_app.repositories.PlayerRepository;
 
 @SpringBootTest
@@ -1097,5 +1098,428 @@ public class GameServiceTest {
         // Verify game continues in CLASH_PLAYER_TURN
         Assertions.assertEquals(GameState.CLASH_PLAYER_TURN, testGame.getState(),
             "Clash should continue when multiple players remain");
+    }
+
+    // =====================================================
+    // STATE GUARD TESTS
+    // =====================================================
+    
+    @Test
+    void testPutCardInPlayRejectsInvalidState() {
+        // Setup: Create game in WAITING_FOR_PLAYERS state
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        game.addPlayer(pOne);
+        pOne.setGameId(game.getId());
+        gameService.addGame(game);
+    
+        when(playerService.findPlayerById(pOne.getId())).thenReturn(Optional.of(pOne));
+        
+        // Clear auto-generated deck and add a single test card
+        Player gamePlayer = game.getPlayer(pOne.getId());
+        gamePlayer.getDeck().clear();
+        Card testCard = new Card(CardStyle.ATTACKER, 1);
+        gamePlayer.addCardToDeck(testCard);
+    
+        // Attempt to play card when not in DRAWING_CARDS or CLASH_PLAYER_REPLACING_CARD
+        boolean result = gameService.putCardInPlay(pOne.getId(), testCard);
+    
+        // Verify action was rejected
+        Assertions.assertFalse(result);
+        Assertions.assertEquals(1, gamePlayer.getDeckSize());
+    }
+    
+    @Test
+    void testRollInitForPlayerRejectsInvalidState() {
+        // Setup: Game in DRAWING_CARDS state
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        game.addPlayer(pOne);
+        pOne.setGameId(game.getId());
+        game.setState(GameState.DRAWING_CARDS);
+        gameService.addGame(game);
+    
+        when(playerService.findPlayerById(pOne.getId())).thenReturn(Optional.of(pOne));
+    
+        // Attempt to roll initiative when not in CLASH_ROLL_INIT
+        int result = gameService.rollInitForPlayer(pOne.getId());
+    
+        // Verify action was rejected
+        Assertions.assertEquals(-1, result);
+    }
+    
+    @Test
+    void testResolveClashActionRejectsInvalidState() {
+        // Setup: Game in DRAWING_CARDS state
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+        game.addPlayer(pOne);
+        game.addPlayer(pTwo);
+        pOne.setGameId(game.getId());
+        pTwo.setGameId(game.getId());
+        game.setState(GameState.DRAWING_CARDS);
+        gameService.addGame(game);
+    
+        when(playerService.findPlayerById(pOne.getId())).thenReturn(Optional.of(pOne));
+        when(playerService.findPlayerById(pTwo.getId())).thenReturn(Optional.of(pTwo));
+    
+        // Attempt to resolve action when not in CLASH_PLAYER_TURN
+        int result = gameService.resolveClashAction(pOne.getId(), pTwo.getId());
+    
+        // Verify action was rejected
+        Assertions.assertEquals(-1, result);
+        Assertions.assertNotEquals(GameState.CLASH_PROCESSING_DECISION, game.getState());
+    }
+    
+    @Test
+    void testPlayerForfeitClashRejectsInvalidState() {
+        // Setup: Game in DRAWING_CARDS state
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        game.addPlayer(pOne);
+        pOne.setGameId(game.getId());
+        game.setState(GameState.DRAWING_CARDS);
+        gameService.addGame(game);
+    
+        when(playerService.findPlayerById(pOne.getId())).thenReturn(Optional.of(pOne));
+    
+        // Get initial state
+        GameState initialState = game.getState();
+    
+        // Attempt forfeit when not in CLASH_PLAYER_TURN or CLASH_PLAYER_REPLACING_CARD
+        gameService.playerForfeitClash(pOne.getId());
+    
+        // Verify state did not change
+        Assertions.assertEquals(initialState, game.getState());
+    }
+    
+    // =====================================================
+    // WIN CONDITION #2 TESTS (Only One Player with Cards)
+    // =====================================================
+    
+    @Test
+    void testWinCondition2_OnlyOnePlayerWithCards() {
+        // Setup: Game with 2 players, pTwo has no cards
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+        
+        game.addPlayer(pOne);
+        game.addPlayer(pTwo);
+        pOne.setGameId(game.getId());
+        pTwo.setGameId(game.getId());
+        
+        // Clear auto-generated decks
+        game.getPlayer(pOne.getId()).getDeck().clear();
+        game.getPlayer(pTwo.getId()).getDeck().clear();
+        
+        // Set up cards: pOne has cards, pTwo has none
+        Card card1 = new Card(CardStyle.ATTACKER, 1);
+        Card card2 = new Card(CardStyle.DEFENDER, 1);
+        game.getPlayer(pOne.getId()).addCardToDeck(card1);
+        game.getPlayer(pOne.getId()).addCardToDeck(card2);
+        // pTwo has empty hand
+        
+        game.setState(GameState.CLASH_CONCLUDED);
+        gameService.addGame(game);
+    
+        // Transition to next clash
+        boolean result = gameService.startNewClash(game.getId());
+    
+        // Verify game transitioned to FINISHED
+        Assertions.assertTrue(result);
+        Assertions.assertEquals(GameState.FINISHED, game.getState());
+    }
+    
+    @Test
+    void testWinCondition2_OnlyOnePlayerWithSingleCard() {
+        // Setup: Game with 3 players, only pOne has 1 card
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+        Player pThree = new Player("Player Three");
+        
+        game.addPlayer(pOne);
+        game.addPlayer(pTwo);
+        game.addPlayer(pThree);
+        pOne.setGameId(game.getId());
+        pTwo.setGameId(game.getId());
+        pThree.setGameId(game.getId());
+        
+        // Clear auto-generated decks
+        game.getPlayer(pOne.getId()).getDeck().clear();
+        game.getPlayer(pTwo.getId()).getDeck().clear();
+        game.getPlayer(pThree.getId()).getDeck().clear();
+        
+        // pOne has 1 card
+        Card card = new Card(CardStyle.ATTACKER, 1);
+        game.getPlayer(pOne.getId()).addCardToDeck(card);
+        // pTwo and pThree have empty hands
+        
+        game.setState(GameState.CLASH_CONCLUDED);
+        gameService.addGame(game);
+    
+        // Transition to next clash
+        boolean result = gameService.startNewClash(game.getId());
+    
+        // Verify game transitioned to FINISHED
+        Assertions.assertTrue(result);
+        Assertions.assertEquals(GameState.FINISHED, game.getState());
+    }
+    
+    // =====================================================================
+    // WIN CONDITION #3 TESTS (No Players with Cards, Most Sacred Stones)
+    // =====================================================================
+    
+    @Test
+    void testWinCondition3_NoPlayersWithCards_StraightWinner() {
+        // Setup: Game with 2 players, both have no cards
+        // pOne has 2 sacred stones, pTwo has 1
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+        
+        game.addPlayer(pOne);
+        game.addPlayer(pTwo);
+        pOne.setGameId(game.getId());
+        pTwo.setGameId(game.getId());
+        
+        // Clear auto-generated decks so both have empty hands
+        game.getPlayer(pOne.getId()).getDeck().clear();
+        game.getPlayer(pTwo.getId()).getDeck().clear();
+        
+        // Set sacred stones
+        game.getPlayer(pOne.getId()).setSacredStones(2);
+        game.getPlayer(pTwo.getId()).setSacredStones(1);
+        
+        game.setState(GameState.CLASH_CONCLUDED);
+        gameService.addGame(game);
+    
+        // Transition to next clash
+        boolean result = gameService.startNewClash(game.getId());
+    
+        // Verify game transitioned to FINISHED
+        Assertions.assertTrue(result);
+        Assertions.assertEquals(GameState.FINISHED, game.getState());
+    }
+    
+    @Test
+    void testWinCondition3_NoPlayersWithCards_TiedWinners() {
+        // Setup: Game with 3 players, all have no cards
+        // pOne and pTwo both have 2 sacred stones (tied for first)
+        // pThree has 1 sacred stone
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+        Player pThree = new Player("Player Three");
+        
+        game.addPlayer(pOne);
+        game.addPlayer(pTwo);
+        game.addPlayer(pThree);
+        pOne.setGameId(game.getId());
+        pTwo.setGameId(game.getId());
+        pThree.setGameId(game.getId());
+        
+        // Clear auto-generated decks so all have empty hands
+        game.getPlayer(pOne.getId()).getDeck().clear();
+        game.getPlayer(pTwo.getId()).getDeck().clear();
+        game.getPlayer(pThree.getId()).getDeck().clear();
+        
+        // Set sacred stones
+        game.getPlayer(pOne.getId()).setSacredStones(2);
+        game.getPlayer(pTwo.getId()).setSacredStones(2);
+        game.getPlayer(pThree.getId()).setSacredStones(1);
+        
+        game.setState(GameState.CLASH_CONCLUDED);
+        gameService.addGame(game);
+    
+        // Transition to next clash
+        boolean result = gameService.startNewClash(game.getId());
+    
+        // Verify game transitioned to FINISHED
+        Assertions.assertTrue(result);
+        Assertions.assertEquals(GameState.FINISHED, game.getState());
+    }
+    
+    @Test
+    void testWinCondition3_AllPlayersTiedForFirst() {
+        // Setup: Game with 2 players, both have no cards and same sacred stones
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+        
+        game.addPlayer(pOne);
+        game.addPlayer(pTwo);
+        pOne.setGameId(game.getId());
+        pTwo.setGameId(game.getId());
+        
+        // Clear auto-generated decks so both have empty hands
+        game.getPlayer(pOne.getId()).getDeck().clear();
+        game.getPlayer(pTwo.getId()).getDeck().clear();
+        
+        // Both have same stone count
+        game.getPlayer(pOne.getId()).setSacredStones(2);
+        game.getPlayer(pTwo.getId()).setSacredStones(2);
+        
+        game.setState(GameState.CLASH_CONCLUDED);
+        gameService.addGame(game);
+    
+        // Transition to next clash
+        boolean result = gameService.startNewClash(game.getId());
+    
+        // Verify game transitioned to FINISHED
+        Assertions.assertTrue(result);
+        Assertions.assertEquals(GameState.FINISHED, game.getState());
+    }
+    
+    // =====================================================
+    // PODIUM VIEW DTO TESTS
+    // =====================================================
+    
+    @Test
+    void testPodiumViewSinglePlayer() {
+        // Setup: Game with 1 player
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        game.addPlayer(pOne);
+        pOne.setSacredStones(2);
+        game.setState(GameState.FINISHED);
+    
+        // Convert to PodiumView
+        PodiumView podium = PodiumView.fromGame(game);
+    
+        // Verify
+        Assertions.assertNotNull(podium);
+        Assertions.assertEquals(1, podium.getEntries().size());
+        Assertions.assertEquals(1, podium.getEntries().get(0).getPlacement());
+        Assertions.assertEquals(1, podium.getEntries().get(0).getPlayers().size());
+        Assertions.assertEquals(2, podium.getEntries().get(0).getSacredStones());
+    }
+    
+    @Test
+    void testPodiumViewDifferentStoneCount() {
+        // Setup: Game with 3 players, different stone counts
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+        Player pThree = new Player("Player Three");
+        
+        game.addPlayer(pOne);
+        game.addPlayer(pTwo);
+        game.addPlayer(pThree);
+        pOne.setSacredStones(3);
+        pTwo.setSacredStones(2);
+        pThree.setSacredStones(1);
+        game.setState(GameState.FINISHED);
+    
+        // Convert to PodiumView
+        PodiumView podium = PodiumView.fromGame(game);
+    
+        // Verify
+        Assertions.assertEquals(3, podium.getEntries().size());
+        // 1st place
+        Assertions.assertEquals(1, podium.getEntries().get(0).getPlacement());
+        Assertions.assertEquals(1, podium.getEntries().get(0).getPlayers().size());
+        Assertions.assertEquals(3, podium.getEntries().get(0).getSacredStones());
+        // 2nd place
+        Assertions.assertEquals(2, podium.getEntries().get(1).getPlacement());
+        Assertions.assertEquals(1, podium.getEntries().get(1).getPlayers().size());
+        Assertions.assertEquals(2, podium.getEntries().get(1).getSacredStones());
+        // 3rd place
+        Assertions.assertEquals(3, podium.getEntries().get(2).getPlacement());
+        Assertions.assertEquals(1, podium.getEntries().get(2).getPlayers().size());
+        Assertions.assertEquals(1, podium.getEntries().get(2).getSacredStones());
+    }
+    
+    @Test
+    void testPodiumViewTiedFirstPlace() {
+        // Setup: Game with 3 players, two tied for first
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+        Player pThree = new Player("Player Three");
+        
+        game.addPlayer(pOne);
+        game.addPlayer(pTwo);
+        game.addPlayer(pThree);
+        pOne.setSacredStones(2);
+        pTwo.setSacredStones(2);
+        pThree.setSacredStones(1);
+        game.setState(GameState.FINISHED);
+    
+        // Convert to PodiumView
+        PodiumView podium = PodiumView.fromGame(game);
+    
+        // Verify
+        Assertions.assertEquals(2, podium.getEntries().size());
+        // 1st place (2 players tied)
+        Assertions.assertEquals(1, podium.getEntries().get(0).getPlacement());
+        Assertions.assertEquals(2, podium.getEntries().get(0).getPlayers().size());
+        Assertions.assertEquals(2, podium.getEntries().get(0).getSacredStones());
+        // 3rd place (skipped 2nd because of tie)
+        Assertions.assertEquals(3, podium.getEntries().get(1).getPlacement());
+        Assertions.assertEquals(1, podium.getEntries().get(1).getPlayers().size());
+        Assertions.assertEquals(1, podium.getEntries().get(1).getSacredStones());
+    }
+    
+    @Test
+    void testPodiumViewTiedSecondPlace() {
+        // Setup: Game with 3 players, two tied for second
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+        Player pThree = new Player("Player Three");
+        
+        game.addPlayer(pOne);
+        game.addPlayer(pTwo);
+        game.addPlayer(pThree);
+        pOne.setSacredStones(3);
+        pTwo.setSacredStones(1);
+        pThree.setSacredStones(1);
+        game.setState(GameState.FINISHED);
+    
+        // Convert to PodiumView
+        PodiumView podium = PodiumView.fromGame(game);
+    
+        // Verify
+        Assertions.assertEquals(2, podium.getEntries().size());
+        // 1st place
+        Assertions.assertEquals(1, podium.getEntries().get(0).getPlacement());
+        Assertions.assertEquals(1, podium.getEntries().get(0).getPlayers().size());
+        Assertions.assertEquals(3, podium.getEntries().get(0).getSacredStones());
+        // 2nd place (2 players tied)
+        Assertions.assertEquals(2, podium.getEntries().get(1).getPlacement());
+        Assertions.assertEquals(2, podium.getEntries().get(1).getPlayers().size());
+        Assertions.assertEquals(1, podium.getEntries().get(1).getSacredStones());
+    }
+    
+    @Test
+    void testPodiumViewAllPlayersTied() {
+        // Setup: Game with 4 players, all tied with same stone count
+        Game game = new Game();
+        Player pOne = new Player("Player One");
+        Player pTwo = new Player("Player Two");
+        Player pThree = new Player("Player Three");
+        Player pFour = new Player("Player Four");
+        
+        game.addPlayer(pOne);
+        game.addPlayer(pTwo);
+        game.addPlayer(pThree);
+        game.addPlayer(pFour);
+        pOne.setSacredStones(2);
+        pTwo.setSacredStones(2);
+        pThree.setSacredStones(2);
+        pFour.setSacredStones(2);
+        game.setState(GameState.FINISHED);
+    
+        // Convert to PodiumView
+        PodiumView podium = PodiumView.fromGame(game);
+    
+        // Verify: all 4 players in single entry with placement 1
+        Assertions.assertEquals(1, podium.getEntries().size());
+        Assertions.assertEquals(1, podium.getEntries().get(0).getPlacement());
+        Assertions.assertEquals(4, podium.getEntries().get(0).getPlayers().size());
+        Assertions.assertEquals(2, podium.getEntries().get(0).getSacredStones());
     }
 }

@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, inject, Input, OnDestroy, OnInit } from "
 import { GameService } from "../../services/game.service";
 import { Player } from "../player";
 import { Subscription } from "rxjs";
+import { Router } from "@angular/router";
 
 @Component({
     selector: 'app-queue',
@@ -17,6 +18,7 @@ export class QueueComponent implements OnInit, OnDestroy {
   @Input() public passcode: string = '';
 
   private gameService = inject(GameService);
+  private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
 
   public player: Player | null = null;
@@ -42,7 +44,10 @@ export class QueueComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.gameService.createGame(passcode)
+    this.gameService.createGame(passcode).subscribe({
+      next: () => this.router.navigate(['/lobby']),
+      error: (e) => console.error('Failed to join game: ', e)
+    });
   }
 
 }

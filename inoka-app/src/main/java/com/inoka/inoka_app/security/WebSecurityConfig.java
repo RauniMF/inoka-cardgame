@@ -57,11 +57,16 @@ public class WebSecurityConfig {
             .exceptionHandling(e -> e.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(s -> s.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
-                .requestMatchers("/inoka/auth/**", "/inoka/player/add", "/inoka/player/refresh-token")
-                .permitAll()
-                // Permit ALL SockJS endpoints - these are needed for the handshake
+                // Public authentication endpoints
+                .requestMatchers("/inoka/auth/**", "/inoka/player/add", "/inoka/player/refresh-token").permitAll()
+                // Health check endpoints (for Docker/K8s)
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                // WebSocket endpoints (auth enforced at STOMP level)
                 .requestMatchers("/ws/**").permitAll()
-                .anyRequest().authenticated()
+                // Protected API endpoints
+                .requestMatchers("/inoka/**").authenticated()
+                // Allow everything else (SPA routes, static resources)
+                .anyRequest().permitAll()
             );
 
             http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
