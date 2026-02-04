@@ -5,9 +5,9 @@ FROM node:20-alpine AS frontend-build
 
 WORKDIR /frontend
 
-# Copy package files and install dependencies
+# Copy package files and install dependencies (including dev dependencies for build)
 COPY inoka-front/package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy frontend source and build
 COPY inoka-front/ ./
@@ -25,16 +25,14 @@ WORKDIR /backend
 # Copy the entire inoka-app directory
 COPY inoka-app/ ./
 
-# Install dos2unix to fix Windows line endings (CRLF -> LF)
-RUN apk add --no-cache dos2unix && dos2unix ./gradlew
-
-# Make gradlew executable (this is the fix!)
-RUN chmod +x ./gradlew
+# Fix Windows line endings (CRLF -> LF) and make gradlew executable
+RUN sed -i 's/\r$//' ./gradlew && chmod +x ./gradlew
 
 # Download dependencies (cached layer)
 RUN ./gradlew dependencies --no-daemon
 
 # Copy built frontend into Spring Boot static resources
+# Angular builds to dist/inoka-front/browser, we want the contents in static/
 COPY --from=frontend-build /frontend/dist/inoka-front/browser ./src/main/resources/static
 
 # Build the Spring Boot JAR

@@ -11,14 +11,17 @@ spring.application.name=inoka_app
 # For Docker Compose:
 #   Environment variables override these values automatically.
 #   See docker-compose.yml and .env.example
-spring.datasource.url=jdbc:mysql://localhost:3306/playerdb
-spring.datasource.username=CHANGE_ME_your_username
-spring.datasource.password=CHANGE_ME_your_password
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/playerdb}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:CHANGE_ME_your_username}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:CHANGE_ME_your_password}
 
 # JPA/Hibernate Configuration
 spring.jpa.show-sql=true
 spring.jpa.hibernate.ddl-auto=update
 spring.jackson.default-property-inclusion=always
+
+# WebSocket Configuration
+websocket.allowed.origins=${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:8080,http://localhost:4200}
 
 # ===========================================
 # JWT Configuration
@@ -27,8 +30,8 @@ spring.jackson.default-property-inclusion=always
 #   openssl rand -hex 32
 #
 # IMPORTANT: Never commit your actual JWT secret to Git!
-jwt.secret=CHANGE_ME_generate_with_openssl_rand_hex_32
-jwt.expiration=86400000
+jwt.secret=${JWT_SECRET:CHANGE_ME_generate_with_openssl_rand_hex_32}
+jwt.expiration=${JWT_EXPIRATION:86400000}
 
 # ===========================================
 # Logging Configuration

@@ -43,7 +43,7 @@ The fastest way to demo the application is using Docker Compose, which automatic
 
 3. **Start the application**
    ```bash
-   docker-compose up
+   docker-compose up --build
    ```
 
    The first time will take 5-10 minutes to build. Subsequent starts are much faster.

@@ -10,7 +10,7 @@ import { GameWebSocketService } from "./game-websocket.service";
     providedIn: 'root' // Ensures a singleton instance across the entire application
 })
 export class GameService {
-    private apiServerUrl = 'http://localhost:8080/inoka';
+    private apiServerUrl = '/inoka';
     private currentGameId: string | null = null;
 
     // BehaviorSubject holds player's data
