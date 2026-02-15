@@ -1,14 +1,18 @@
 package com.inoka.inoka_app.service;
 
 import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import com.inoka.inoka_app.event.SystemMessageEvent;
 import com.inoka.inoka_app.model.ChatMessage;
 import com.inoka.inoka_app.model.ChatType;
 import com.inoka.inoka_app.model.Game;
@@ -19,7 +23,7 @@ import com.inoka.inoka_app.model.PlayerView;
 public class ChatService {
     private static final int MAX_MESSAGES_PER_GAME = 32;
 
-    private final Map<String, Deque<ChatMessage>> chatMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Deque<ChatMessage>> chatMap = new ConcurrentHashMap<>();
     private final GameService gameService;
     private final SimpMessagingTemplate messagingTemplate;
     
@@ -34,9 +38,23 @@ public class ChatService {
      * @param message
      */
     private void append(String gameId, ChatMessage message) {
-        
+        chatMap.compute(gameId, (id, deque) -> {
+            if (deque == null) {
+                deque = new ArrayDeque<>();
+            }
+            synchronized(deque) {
+                deque.addLast(message);
+                while (deque.size() > MAX_MESSAGES_PER_GAME) {
+                    deque.removeFirst();
+                }
+                return deque;
+            }
+        });
     }
     
+    public void clear(String gameId) {
+        chatMap.remove(gameId);
+    }
 
     /**
      * Called by WebSocketController to process incoming user messages
@@ -62,6 +80,40 @@ public class ChatService {
         PlayerView senderView = PlayerView.fromPlayer(player, game.getSeatForPlayer(sender));
         ChatMessage message = new ChatMessage(senderView, trimmed, Instant.now(), ChatType.PLAYER);
 
-        // Append to map and broadcast
+        append(gameId, message);
+        broadcast(gameId, message);
+    }
+
+    public List<ChatMessage> getHistory(String gameId) {
+        // Stored messages include PLAYER and INFO
+        Deque<ChatMessage> deque = chatMap.get(gameId);
+        if (deque == null) {
+            return List.of();
+        }
+        List<ChatMessage> messages = new ArrayList<>(deque);
+        return messages;
+    }
+
+    public void addSystemMessage(String gameId, String content, ChatType type) {
+        ChatMessage message = new ChatMessage(null, content, Instant.now(), type);
+        // Stored messages include PLAYER and INFO
+        if (type != ChatType.WARNING) {
+            append(gameId, message);
+        }
+        broadcast(gameId, message);
+    }
+
+    public void broadcast(String gameId, ChatMessage message) {
+        messagingTemplate.convertAndSend("/topic/game/" + gameId + "/chat", message);
+    }
+
+    @EventListener
+    public void onSystemMessageEvent(SystemMessageEvent event) {
+        if (event.getContent().equals("GAME CONCLUDED")) {
+            // Game concluded = remove chat history
+            clear(event.getGameId());
+            return;
+        }
+        addSystemMessage(event.getGameId(), event.getContent(), event.getType());
     }
 }

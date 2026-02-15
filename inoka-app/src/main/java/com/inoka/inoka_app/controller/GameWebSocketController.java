@@ -16,15 +16,20 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.Game;
+import com.inoka.inoka_app.service.ChatService;
 import com.inoka.inoka_app.service.GameService;
 
 @RestController
 public class GameWebSocketController {
+
+    
     private final GameService gameService;
+    private final ChatService chatService;
     private static final Logger logger = LoggerFactory.getLogger(GameWebSocketController.class);
     
-    public GameWebSocketController(GameService gameService) {
+    public GameWebSocketController(GameService gameService, ChatService chatService) {
         this.gameService = gameService;
+        this.chatService = chatService;
     }
 
     @EventListener
@@ -132,5 +137,25 @@ public class GameWebSocketController {
         String playerId = principal.getName();
         gameService.updatePlayerActivity(playerId);
         gameService.playerForfeitClash(playerId);
+    }
+
+    @MessageMapping("/chat/send")
+    public void handleChatMessage(@Payload Map<String, Object> payload, Principal principal) {
+        if (principal == null) {
+            logger.warn("Unauthorized chat send attempt");
+            return;
+        }
+
+        String chatContent = (String) payload.get("chatContent");
+        
+        String playerId = principal.getName();
+        Optional<Game> gameOpt = gameService.getGameByPlayerId(playerId);
+        if (gameOpt.isEmpty()) {
+            logger.warn("Player {} not in any game", playerId);
+            return;
+        }
+        
+        Game game = gameOpt.get();
+        chatService.handlePlayerMessage(game.getId(), playerId, chatContent);
     }
 }

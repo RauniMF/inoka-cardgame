@@ -3,6 +3,7 @@ package com.inoka.inoka_app.controller;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.inoka.inoka_app.model.Card;
+import com.inoka.inoka_app.model.ChatMessage;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 import com.inoka.inoka_app.model.GameView;
@@ -12,6 +13,7 @@ import com.inoka.inoka_app.model.PlayerView;
 import com.inoka.inoka_app.model.PodiumView;
 import com.inoka.inoka_app.security.JwtUtil;
 import com.inoka.inoka_app.security.PlayerPrincipal;
+import com.inoka.inoka_app.service.ChatService;
 import com.inoka.inoka_app.service.GameService;
 import com.inoka.inoka_app.service.PlayerService;
 
@@ -41,15 +43,18 @@ public class GameController {
 
     private final PlayerService playerService;
     private final GameService gameService;
+    private final ChatService chatService;
     private final JwtUtil jwtUtil;
 
     public GameController(
         PlayerService playerService,
         GameService gameService,
+        ChatService chatService,
         JwtUtil jwtUtil
     ) {
         this.playerService = playerService;
         this.gameService = gameService;
+        this.chatService = chatService;
         this.jwtUtil = jwtUtil;
     }
     
@@ -359,4 +364,20 @@ public class GameController {
         return ResponseEntity.ok(podiumView);
     }
     
+    @GetMapping("/game/chats")
+    public ResponseEntity<List<ChatMessage>> getChatHistory(@AuthenticationPrincipal PlayerPrincipal principal) {
+        if (principal == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
+        Player player = principal.getPlayer();
+
+        Optional<Game> gameOpt = gameService.getGameByPlayerId(player.getId());
+        if (gameOpt.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        Game game = gameOpt.get();
+        return ResponseEntity.ok(chatService.getHistory(game.getId()));
+    }
 }

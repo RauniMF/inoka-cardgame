@@ -7,12 +7,14 @@ import org.springframework.stereotype.Service;
 
 import com.inoka.inoka_app.event.DeckUpdateEvent;
 import com.inoka.inoka_app.event.GameUpdateEvent;
+import com.inoka.inoka_app.event.SystemMessageEvent;
 import com.inoka.inoka_app.model.Player;
 import jakarta.annotation.PostConstruct;
 
 import com.inoka.inoka_app.model.Action;
 import com.inoka.inoka_app.model.Card;
 import com.inoka.inoka_app.model.CardStyle;
+import com.inoka.inoka_app.model.ChatType;
 import com.inoka.inoka_app.model.Game;
 import com.inoka.inoka_app.model.GameState;
 
@@ -64,6 +66,9 @@ public class GameService {
     private void publishDeckUpdate(Player player) {
         List<Card> deck = player.getDeck();
         eventPublisher.publishEvent(new DeckUpdateEvent(this, player.getId(), deck));
+    }
+    private void publishSystemMessage(String gameId, String content, ChatType type) {
+        eventPublisher.publishEvent(new SystemMessageEvent(this, gameId, content, type));
     }
 
     @PostConstruct
@@ -274,6 +279,7 @@ public class GameService {
                     this.playerService.savePlayer(player);
                 }
             }
+            this.publishSystemMessage(gameId, "GAME CONCLUDED", ChatType.WARNING);
         }
     }
 
@@ -446,6 +452,12 @@ public class GameService {
                         }
                         player.setInitiative(playerTransient.getInitiative());
                     } while (!game.addPlayerInitiativeToMap(player));
+                    // Log at INFO level in chat
+                    this.publishSystemMessage(
+                        gameId, 
+                        String.format("%s rolled a %d for initiative.", player.getName(), player.getInitiative()), 
+                        ChatType.INFO
+                    );
                     /*
                      * If all players have rolled initiative,
                      * and game is currently in CLASH_ROLL_INIT state,
@@ -493,14 +505,21 @@ public class GameService {
                     }
 
                     int damage = -1;
-                    if (!receivingPlayerId.equals("null")) {
+                    String message = "";
+                    Optional<Player> receivingPlayerOpt = this.playerService.findPlayerById(receivingPlayerId);
+                    if (receivingPlayerOpt.isPresent()) {
+                        Player receivingPlayer = receivingPlayerOpt.get();
                         // Deal damage
                         damage = game.dealDamage(dealingPlayerId, receivingPlayerId);
                         result.set(0, damage);
-                    } 
-                    
+                        message = String.format("%s dealt %d damage to %s!", player.getName(), damage, receivingPlayer.getName());
+                    }
+                    else {
+                        message = String.format("%s skipped their turn.", player.getName());
+                    }
                     game.setLastAction(dealingPlayerId, receivingPlayerId, result.get(0));
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    this.publishSystemMessage(gameId, message, ChatType.INFO);
                     game.setProcessingTimestamp(System.currentTimeMillis());
                     this.publishGameUpdate(gameId);
                     return game;
@@ -578,6 +597,11 @@ public class GameService {
                     // Update game state & last action
                     game.setLastAction("null", playerId, -1);
                     game.setState(GameState.CLASH_PROCESSING_DECISION);
+                    this.publishSystemMessage(
+                        gameId, 
+                        String.format("%s forfeited from the clash.", player.getName()), 
+                        ChatType.INFO
+                    );
                     game.setProcessingTimestamp(System.currentTimeMillis());
                     this.publishGameUpdate(gameId);
                     return game;
